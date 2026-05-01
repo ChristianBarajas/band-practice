@@ -3,16 +3,15 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// ✅ Put your Firebase config here (from Firebase Console → Project settings → Your apps)
 const firebaseConfig = {
-    apiKey: "AIzaSyB38xv5KAvF3gJ4rL2tJke4iRB6oIZhQIw",
-    authDomain: "band-practice-85891.firebaseapp.com",
-    projectId: "band-practice-85891",
-    storageBucket: "band-practice-85891.firebasestorage.app",
-    messagingSenderId: "1046609505150",
-    appId: "1:1046609505150:web:43f47979bc92f3528fa12f",
-    measurementId: "G-Z351RS28Y7"
-  };
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
 
 const app = initializeApp(firebaseConfig);
 
