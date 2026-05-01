@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -10,15 +10,62 @@ import {
   onAuthStateChanged,
 } from "firebase/auth";
 
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+
+///////////////////////////////////////////////////////////
+// 🔥 SAVE USER TO FIRESTORE
+///////////////////////////////////////////////////////////
+
+async function saveUserProfile(user, extraData = {}) {
+  if (!user) return;
+
+  const userRef = doc(db, "users", user.uid);
+
+  const profileData = {
+    displayName:
+      user.displayName ||
+      `${extraData.firstName || ""} ${extraData.lastName || ""}`.trim(),
+    email: user.email || "",
+    photoURL: user.photoURL || "",
+    updatedAt: serverTimestamp(),
+  };
+
+  // Only save first/last name if we actually have values.
+  // This prevents login/auth refresh from overwriting them with blanks.
+  if (extraData.firstName) {
+    profileData.firstName = extraData.firstName;
+  }
+
+  if (extraData.lastName) {
+    profileData.lastName = extraData.lastName;
+  }
+
+  // Only set createdAt on first creation attempt.
+  if (extraData.isNewUser) {
+    profileData.createdAt = serverTimestamp();
+  }
+
+  await setDoc(userRef, profileData, { merge: true });
+}
+
+///////////////////////////////////////////////////////////
+// 🚀 APP ROOT
+///////////////////////////////////////////////////////////
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        await saveUserProfile(u);
+      }
+
       setUser(u);
       setLoading(false);
     });
+
     return () => unsub();
   }, []);
 
@@ -48,6 +95,13 @@ function AuthPage() {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
         const res = await createUserWithEmailAndPassword(auth, email, password);
+
+        await saveUserProfile(res.user, {
+          firstName: first.trim(),
+          lastName: last.trim(),
+          isNewUser: true,
+        });
+
         await sendEmailVerification(res.user);
         alert("Check your email to verify!");
       }
@@ -57,8 +111,16 @@ function AuthPage() {
   };
 
   const handleGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      const provider = new GoogleAuthProvider();
+      const res = await signInWithPopup(auth, provider);
+
+      await saveUserProfile(res.user, {
+        isNewUser: true,
+      });
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return (
@@ -68,13 +130,31 @@ function AuthPage() {
 
         {!isLogin && (
           <>
-            <input placeholder="First Name" onChange={(e) => setFirst(e.target.value)} />
-            <input placeholder="Last Name" onChange={(e) => setLast(e.target.value)} />
+            <input
+              placeholder="First Name"
+              value={first}
+              onChange={(e) => setFirst(e.target.value)}
+            />
+            <input
+              placeholder="Last Name"
+              value={last}
+              onChange={(e) => setLast(e.target.value)}
+            />
           </>
         )}
 
-        <input placeholder="Email" onChange={(e) => setEmail(e.target.value)} />
-        <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+        <input
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
         <button onClick={handleEmailAuth}>
           {isLogin ? "Login" : "Sign Up"}
@@ -109,11 +189,10 @@ function VerifyPage({ user }) {
 }
 
 ///////////////////////////////////////////////////////////
-// 🏠 HOME PAGE (BANDS UI)
+// 🏠 HOME PAGE
 ///////////////////////////////////////////////////////////
 
 function HomePage({ user }) {
-  // TEMP fake bands
   const [bands, setBands] = useState([]);
 
   return (
@@ -123,10 +202,8 @@ function HomePage({ user }) {
         <button onClick={() => signOut(auth)}>Logout</button>
       </div>
 
-      {/* ADD BUTTON */}
       <button style={styles.plus}>+</button>
 
-      {/* BANDS */}
       {bands.length === 0 ? (
         <div style={styles.roadie}>Currently a roadie 🛠️</div>
       ) : (
