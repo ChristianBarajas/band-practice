@@ -30,8 +30,6 @@ async function saveUserProfile(user, extraData = {}) {
     updatedAt: serverTimestamp(),
   };
 
-  // Only save first/last name if we actually have values.
-  // This prevents login/auth refresh from overwriting them with blanks.
   if (extraData.firstName) {
     profileData.firstName = extraData.firstName;
   }
@@ -40,7 +38,6 @@ async function saveUserProfile(user, extraData = {}) {
     profileData.lastName = extraData.lastName;
   }
 
-  // Only set createdAt on first creation attempt.
   if (extraData.isNewUser) {
     profileData.createdAt = serverTimestamp();
   }
@@ -57,12 +54,12 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      if (u) {
-        await saveUserProfile(u);
+    const unsub = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        await saveUserProfile(currentUser);
       }
 
-      setUser(u);
+      setUser(currentUser);
       setLoading(false);
     });
 
@@ -75,7 +72,7 @@ export default function App() {
 
   if (!user.emailVerified) return <VerifyPage user={user} />;
 
-  return <HomePage user={user} />;
+  return <HomePage />;
 }
 
 ///////////////////////////////////////////////////////////
@@ -192,8 +189,8 @@ function VerifyPage({ user }) {
 // 🏠 HOME PAGE
 ///////////////////////////////////////////////////////////
 
-function HomePage({ user }) {
-  const [bands, setBands] = useState([]);
+function HomePage() {
+  const [bands] = useState([]);
 
   return (
     <div style={styles.page}>
@@ -208,9 +205,9 @@ function HomePage({ user }) {
         <div style={styles.roadie}>Currently a roadie 🛠️</div>
       ) : (
         <div style={styles.row}>
-          {bands.map((b, i) => (
-            <div key={i} style={styles.bandCard}>
-              {b.name}
+          {bands.map((band, index) => (
+            <div key={index} style={styles.bandCard}>
+              {band.name}
             </div>
           ))}
         </div>
