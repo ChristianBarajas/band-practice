@@ -36,8 +36,14 @@ describe("App", () => {
   test("shows the auth page when no user is logged in", async () => {
     render(<App />);
 
-    expect(await screen.findByText("Band Practice 🎸")).toBeInTheDocument();
-    expect(screen.getByText("Login")).toBeInTheDocument();
-    expect(screen.getByText("Continue with Google")).toBeInTheDocument();
+    // Updated to match your new UI
+    expect(
+      await screen.findByText(/welcome to band practice/i)
+    ).toBeInTheDocument();
+
+    expect(screen.getByText(/login/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/continue with google/i)
+    ).toBeInTheDocument();
   });
 });
