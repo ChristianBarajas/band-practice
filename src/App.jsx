@@ -230,7 +230,11 @@ function HomePage({ user, goCreateBand }) {
   };
 
   useEffect(() => {
-    loadBands();
+    const run = async () => {
+      await loadBands();
+    };
+  
+    run();
   }, []);
 
   return (
