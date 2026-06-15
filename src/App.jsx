@@ -15,6 +15,7 @@ import {
   addDoc,
   collection,
   doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -50,6 +51,129 @@ function generateInviteCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+function getWednesdayWeekStart(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = (day - 3 + 7) % 7;
+  d.setDate(d.getDate() - diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function formatDateKey(date) {
+  return date.toISOString().split("T")[0];
+}
+
+function formatDayLabel(date) {
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatTimeLabel(time) {
+  if (!time) return "";
+
+  const [hourString, minute] = time.split(":");
+  const hour = Number(hourString);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+
+  return `${displayHour}:${minute} ${ampm}`;
+}
+
+function getAvailabilityWeekDays() {
+  const start = getWednesdayWeekStart();
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+
+    return {
+      date: d,
+      key: formatDateKey(d),
+      label: formatDayLabel(d),
+    };
+  });
+}
+
+function addHoverLift(e) {
+  e.currentTarget.style.transform = "translateY(-8px) scale(1.02)";
+  e.currentTarget.style.boxShadow = "0 0 35px rgba(255,0,0,0.28)";
+  e.currentTarget.style.border = "1px solid rgba(255,255,255,0.22)";
+}
+
+function removeHoverLift(e) {
+  e.currentTarget.style.transform = "translateY(0px) scale(1)";
+  e.currentTarget.style.boxShadow = "0 20px 60px rgba(0,0,0,0.55)";
+  e.currentTarget.style.border = "1px solid rgba(255,255,255,0.1)";
+}
+
+function addButtonHover(e) {
+  e.currentTarget.style.transform = "translateY(-4px) scale(1.03)";
+  e.currentTarget.style.boxShadow = "0 0 22px rgba(255,0,21,0.28)";
+  e.currentTarget.style.border = "1px solid rgba(255,0,21,0.55)";
+}
+
+function removeButtonHover(e) {
+  e.currentTarget.style.transform = "translateY(0px) scale(1)";
+  e.currentTarget.style.boxShadow = "0 14px 35px rgba(0,0,0,0.35)";
+  e.currentTarget.style.border = "1px solid rgba(255,255,255,0.16)";
+}
+
+function addInputHover(e) {
+  e.currentTarget.style.border = "1px solid rgba(255,0,21,0.85)";
+  e.currentTarget.style.boxShadow = "0 0 18px rgba(255,0,21,0.32)";
+  e.currentTarget.style.transform = "scale(1.02)";
+}
+
+function removeInputHover(e) {
+  e.currentTarget.style.border = "1px solid rgba(255,255,255,0.16)";
+  e.currentTarget.style.boxShadow = "0 0 0 rgba(255,0,0,0)";
+  e.currentTarget.style.transform = "scale(1)";
+}
+
+function getSharedAvailability(bandAvailability, weekDays) {
+  const results = [];
+
+  weekDays.forEach((day) => {
+    const slotMap = {};
+
+    bandAvailability.forEach((member) => {
+      const dayData = member.days?.[day.key];
+
+      if (!dayData?.available || !dayData?.slots?.length) return;
+
+      dayData.slots.forEach((slot) => {
+        const slotKey = `${slot.start}-${slot.end}`;
+
+        if (!slotMap[slotKey]) {
+          slotMap[slotKey] = {
+            dayKey: day.key,
+            dayLabel: day.label,
+            start: slot.start,
+            end: slot.end,
+            members: [],
+          };
+        }
+
+        slotMap[slotKey].members.push(
+          member.displayName || member.email || "Member"
+        );
+      });
+    });
+
+    Object.values(slotMap).forEach((slot) => {
+      if (slot.members.length >= 3) {
+        results.push(slot);
+      }
+    });
+  });
+
+  return results;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState("home");
@@ -81,7 +205,7 @@ export default function App() {
   }
 
   if (page === "band" && selectedBand) {
-    return <BandPage band={selectedBand} goHome={goHome} />;
+    return <BandPage user={user} band={selectedBand} goHome={goHome} />;
   }
 
   return (
@@ -239,32 +363,32 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
   const [loadingBands, setLoadingBands] = useState(true);
 
   const loadBands = async () => {
-    setLoadingBands(true);
+    try {
+      setLoadingBands(true);
 
-    const q = query(
-      collection(db, "bands"),
-      where("memberIds", "array-contains", user.uid)
-    );
+      const q = query(
+        collection(db, "bands"),
+        where("memberIds", "array-contains", user.uid)
+      );
 
-    const snap = await getDocs(q);
+      const snap = await getDocs(q);
 
-    setBands(
-      snap.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }))
-    );
-
-    setLoadingBands(false);
+      setBands(
+        snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+      );
+    } catch (err) {
+      console.error("Error loading bands:", err);
+      alert(err.message);
+    } finally {
+      setLoadingBands(false);
+    }
   };
 
   useEffect(() => {
-    const run = async () => {
-      await loadBands();
-    };
-
-    run();
-
+    loadBands();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 
@@ -284,17 +408,33 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
             </h1>
           </div>
 
-          <button style={styles.secondaryButton} onClick={() => signOut(auth)}>
+          <button
+            style={styles.secondaryButton}
+            onClick={() => signOut(auth)}
+            onMouseEnter={addButtonHover}
+            onMouseLeave={removeButtonHover}
+          >
             Logout
           </button>
         </div>
 
         <div style={styles.homeActions}>
-          <button style={styles.primaryButton} onClick={goCreateBand}>
+          <button
+            style={styles.primaryButton}
+            onClick={goCreateBand}
+            onMouseEnter={addButtonHover}
+            onMouseLeave={removeButtonHover}
+          >
             + CREATE BAND
           </button>
 
-          <button style={styles.secondaryButton}>JOIN BAND</button>
+          <button
+            style={styles.secondaryButton}
+            onMouseEnter={addButtonHover}
+            onMouseLeave={removeButtonHover}
+          >
+            JOIN BAND
+          </button>
         </div>
 
         {loadingBands ? (
@@ -308,21 +448,8 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
                 key={band.id}
                 style={styles.bandCard}
                 onClick={() => openBand(band)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform =
-                    "translateY(-8px) scale(1.02)";
-                  e.currentTarget.style.boxShadow =
-                    "0 0 35px rgba(255,0,0,0.25)";
-                  e.currentTarget.style.border =
-                    "1px solid rgba(255,255,255,0.18)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0px) scale(1)";
-                  e.currentTarget.style.boxShadow =
-                    "0 25px 60px rgba(0,0,0,0.75)";
-                  e.currentTarget.style.border =
-                    "1px solid rgba(255,255,255,0.08)";
-                }}
+                onMouseEnter={addHoverLift}
+                onMouseLeave={removeHoverLift}
               >
                 <img src={band.logoURL} alt={band.name} style={styles.bandLogo} />
 
@@ -390,7 +517,12 @@ function CreateBandPage({ user, goHome }) {
       <div style={styles.darkOverlay}></div>
 
       <div style={styles.pageContent}>
-        <button style={styles.backButton} onClick={goHome}>
+        <button
+          style={styles.backButton}
+          onClick={goHome}
+          onMouseEnter={addButtonHover}
+          onMouseLeave={removeButtonHover}
+        >
           ← BACK
         </button>
 
@@ -421,6 +553,8 @@ function CreateBandPage({ user, goHome }) {
             style={styles.primaryButton}
             onClick={handleCreateBand}
             disabled={saving}
+            onMouseEnter={addButtonHover}
+            onMouseLeave={removeButtonHover}
           >
             {saving ? "CREATING..." : "CREATE BAND"}
           </button>
@@ -430,13 +564,99 @@ function CreateBandPage({ user, goHome }) {
   );
 }
 
-function BandPage({ band, goHome }) {
+function BandPage({ user, band, goHome }) {
   const [view, setView] = useState("dashboard");
   const [bandName, setBandName] = useState(band.name);
   const [inviteCode, setInviteCode] = useState(band.inviteCode || "");
   const [logoFile, setLogoFile] = useState(null);
   const [currentLogoURL, setCurrentLogoURL] = useState(band.logoURL);
   const [saving, setSaving] = useState(false);
+
+  const weekDays = getAvailabilityWeekDays();
+  const weekStart = getWednesdayWeekStart();
+  const weekId = formatDateKey(weekStart);
+
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [availabilityDraft, setAvailabilityDraft] = useState({});
+  const [bandAvailability, setBandAvailability] = useState([]);
+  const [loadingBandAvailability, setLoadingBandAvailability] = useState(false);
+
+  const sharedAvailability = getSharedAvailability(bandAvailability, weekDays);
+
+  const loadMyAvailability = async () => {
+    try {
+      const ref = doc(
+        db,
+        "bands",
+        band.id,
+        "availability",
+        weekId,
+        "members",
+        user.uid
+      );
+
+      const snap = await getDoc(ref);
+
+      if (snap.exists()) {
+        setAvailabilityDraft(snap.data().days || {});
+      }
+    } catch (err) {
+      console.error("Error loading my availability:", err);
+    }
+  };
+
+  const saveMyAvailability = async () => {
+    try {
+      setSaving(true);
+
+      await setDoc(
+        doc(db, "bands", band.id, "availability", weekId, "members", user.uid),
+        {
+          uid: user.uid,
+          displayName: user.displayName || user.email,
+          email: user.email || "",
+          bandId: band.id,
+          weekId,
+          weekStart,
+          days: availabilityDraft,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      alert("Availability saved!");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadBandAvailability = async () => {
+    try {
+      setLoadingBandAvailability(true);
+
+      const snap = await getDocs(
+        collection(db, "bands", band.id, "availability", weekId, "members")
+      );
+
+      setBandAvailability(
+        snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+      );
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoadingBandAvailability(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMyAvailability();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [band.id, user.uid, weekId]);
 
   const handleSaveSettings = async () => {
     if (!bandName.trim()) return alert("Band name required.");
@@ -490,7 +710,7 @@ function BandPage({ band, goHome }) {
     {
       title: "My Availability",
       subtitle: "Set when you can practice this week.",
-      value: "Not submitted",
+      value: Object.keys(availabilityDraft).length ? "Submitted" : "Not submitted",
     },
     {
       title: "Band Goals",
@@ -509,7 +729,12 @@ function BandPage({ band, goHome }) {
       <div style={styles.darkOverlay}></div>
 
       <div style={styles.pageContent}>
-        <button style={styles.backButton} onClick={goHome}>
+        <button
+          style={styles.backButton}
+          onClick={goHome}
+          onMouseEnter={addButtonHover}
+          onMouseLeave={removeButtonHover}
+        >
           ← BACK TO DASHBOARD
         </button>
 
@@ -525,6 +750,8 @@ function BandPage({ band, goHome }) {
                 style={styles.settingsButton}
                 onClick={() => setView("settings")}
                 title="Band settings"
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
               >
                 ⚙
               </button>
@@ -541,7 +768,21 @@ function BandPage({ band, goHome }) {
 
               <div style={styles.dashboardSectionGrid}>
                 {dashboardSections.map((section) => (
-                  <div key={section.title} style={styles.dashboardSectionCard}>
+                  <div
+                    key={section.title}
+                    style={{
+                      ...styles.dashboardSectionCard,
+                      cursor:
+                        section.title === "My Availability" ? "pointer" : "default",
+                    }}
+                    onClick={() => {
+                      if (section.title === "My Availability") {
+                        setView("availabilityHome");
+                      }
+                    }}
+                    onMouseEnter={addHoverLift}
+                    onMouseLeave={removeHoverLift}
+                  >
                     <p style={styles.sectionValue}>{section.value}</p>
                     <h2 style={styles.sectionTitle}>{section.title}</h2>
                     <p style={styles.sectionSubtitle}>{section.subtitle}</p>
@@ -550,6 +791,446 @@ function BandPage({ band, goHome }) {
               </div>
             </div>
           </>
+        )}
+
+        {view === "availabilityHome" && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>BAND AVAILABILITY</p>
+                <h1 style={styles.bandPageTitle}>Availability</h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => setView("dashboard")}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK TO BAND
+              </button>
+            </div>
+
+            <div style={styles.availabilityMenuGrid}>
+              <div
+                style={styles.availabilityMenuCard}
+                onClick={() => setView("setAvailability")}
+                onMouseEnter={addHoverLift}
+                onMouseLeave={removeHoverLift}
+              >
+                <p style={styles.sectionValue}>THIS WEEK</p>
+                <h2 style={styles.sectionTitle}>Set My Availability</h2>
+                <p style={styles.sectionSubtitle}>
+                  Choose the days and times you can practice this week.
+                </p>
+              </div>
+
+              <div
+                style={styles.availabilityMenuCard}
+                onClick={async () => {
+                  await loadBandAvailability();
+                  setView("viewBandAvailability");
+                }}
+                onMouseEnter={addHoverLift}
+                onMouseLeave={removeHoverLift}
+              >
+                <p style={styles.sectionValue}>BAND VIEW</p>
+                <h2 style={styles.sectionTitle}>View Band Availability</h2>
+                <p style={styles.sectionSubtitle}>
+                  See when everyone else is free and find 3+ member overlaps.
+                </p>
+              </div>
+
+              <div
+                style={styles.availabilityMenuCard}
+                onMouseEnter={addHoverLift}
+                onMouseLeave={removeHoverLift}
+              >
+                <p style={styles.sectionValue}>LEADER TOOL</p>
+                <h2 style={styles.sectionTitle}>Schedule Practice</h2>
+                <p style={styles.sectionSubtitle}>
+                  Coming soon: lock in a hard practice date.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === "setAvailability" && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>THIS WEEK</p>
+                <h1 style={styles.bandPageTitle}>Set Availability</h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => setView("availabilityHome")}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK
+              </button>
+            </div>
+
+            <div style={styles.weekGrid}>
+              {weekDays.map((day) => {
+                const saved = availabilityDraft[day.key];
+
+                return (
+                  <div
+                    key={day.key}
+                    style={{
+                      ...styles.dayCard,
+                      border:
+                        saved?.available === true
+                          ? "1px solid rgba(0,255,120,0.65)"
+                          : saved?.available === false
+                          ? "1px solid rgba(255,0,0,0.65)"
+                          : "1px solid rgba(255,255,255,0.12)",
+                    }}
+                    onClick={() => {
+                      setSelectedDay(day);
+                      setView("editDayAvailability");
+                    }}
+                    onMouseEnter={addHoverLift}
+                    onMouseLeave={removeHoverLift}
+                  >
+                    <p
+                      style={{
+                        ...styles.sectionValue,
+                        color:
+                          saved?.available === true
+                            ? "#00ff78"
+                            : saved?.available === false
+                            ? "#ff2a2a"
+                            : "#ff2a2a",
+                      }}
+                    >
+                      {saved?.available === true
+                        ? "AVAILABLE"
+                        : saved?.available === false
+                        ? "NOT AVAILABLE"
+                        : "NOT SET"}
+                    </p>
+
+                    <h2 style={styles.sectionTitle}>{day.label}</h2>
+
+                    <p style={styles.sectionSubtitle}>
+                      {saved?.slots?.length
+                        ? saved.slots
+                            .map(
+                              (slot) =>
+                                `${formatTimeLabel(slot.start)} - ${formatTimeLabel(
+                                  slot.end
+                                )}`
+                            )
+                            .join(", ")
+                        : "Tap to set availability"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <button
+              style={{ ...styles.primaryButton, marginTop: 30 }}
+              onClick={saveMyAvailability}
+              disabled={saving}
+              onMouseEnter={addButtonHover}
+              onMouseLeave={removeButtonHover}
+            >
+              {saving ? "SAVING..." : "SAVE WEEK"}
+            </button>
+          </div>
+        )}
+
+        {view === "editDayAvailability" && selectedDay && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>EDIT DAY</p>
+                <h1 style={styles.bandPageTitle}>{selectedDay.label}</h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => setView("setAvailability")}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK
+              </button>
+            </div>
+
+            <div style={styles.settingsPanel}>
+              <button
+                style={styles.primaryButton}
+                onClick={() => {
+                  setAvailabilityDraft((prev) => ({
+                    ...prev,
+                    [selectedDay.key]: {
+                      available: true,
+                      slots: prev[selectedDay.key]?.slots?.length
+                        ? prev[selectedDay.key].slots
+                        : [{ start: "10:00", end: "15:00" }],
+                    },
+                  }));
+                }}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                YES, I AM AVAILABLE
+              </button>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => {
+                  setAvailabilityDraft((prev) => ({
+                    ...prev,
+                    [selectedDay.key]: {
+                      available: false,
+                      slots: [],
+                    },
+                  }));
+                }}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                NO, I AM NOT AVAILABLE
+              </button>
+
+              {availabilityDraft[selectedDay.key]?.available && (
+                <>
+                  <h2 style={styles.sectionTitle}>Time Slots</h2>
+
+                  {availabilityDraft[selectedDay.key].slots.map((slot, index) => (
+                    <div key={index} style={styles.timeSlotRow}>
+                      <input
+                        style={styles.input}
+                        type="time"
+                        value={slot.start}
+                        onMouseEnter={addInputHover}
+                        onMouseLeave={removeInputHover}
+                        onChange={(e) => {
+                          setAvailabilityDraft((prev) => {
+                            const slots = [...prev[selectedDay.key].slots];
+
+                            slots[index] = {
+                              ...slots[index],
+                              start: e.target.value,
+                            };
+
+                            return {
+                              ...prev,
+                              [selectedDay.key]: {
+                                ...prev[selectedDay.key],
+                                slots,
+                              },
+                            };
+                          });
+                        }}
+                      />
+
+                      <input
+                        style={styles.input}
+                        type="time"
+                        value={slot.end}
+                        onMouseEnter={addInputHover}
+                        onMouseLeave={removeInputHover}
+                        onChange={(e) => {
+                          setAvailabilityDraft((prev) => {
+                            const slots = [...prev[selectedDay.key].slots];
+
+                            slots[index] = {
+                              ...slots[index],
+                              end: e.target.value,
+                            };
+
+                            return {
+                              ...prev,
+                              [selectedDay.key]: {
+                                ...prev[selectedDay.key],
+                                slots,
+                              },
+                            };
+                          });
+                        }}
+                      />
+
+                      <button
+                        style={styles.dangerButton}
+                        onClick={() => {
+                          setAvailabilityDraft((prev) => {
+                            const slots = prev[selectedDay.key].slots.filter(
+                              (_, i) => i !== index
+                            );
+
+                            return {
+                              ...prev,
+                              [selectedDay.key]: {
+                                ...prev[selectedDay.key],
+                                slots,
+                              },
+                            };
+                          });
+                        }}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        REMOVE
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    style={styles.secondaryButton}
+                    onClick={() => {
+                      setAvailabilityDraft((prev) => ({
+                        ...prev,
+                        [selectedDay.key]: {
+                          ...prev[selectedDay.key],
+                          slots: [
+                            ...prev[selectedDay.key].slots,
+                            { start: "17:00", end: "22:00" },
+                          ],
+                        },
+                      }));
+                    }}
+                    onMouseEnter={addButtonHover}
+                    onMouseLeave={removeButtonHover}
+                  >
+                    + ADD ANOTHER TIME
+                  </button>
+                </>
+              )}
+
+              <button
+                style={styles.primaryButton}
+                onClick={() => setView("setAvailability")}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                DONE
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === "viewBandAvailability" && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>BAND VIEW</p>
+                <h1 style={styles.bandPageTitle}>Band Availability</h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => setView("availabilityHome")}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK
+              </button>
+            </div>
+
+            {loadingBandAvailability ? (
+              <div style={styles.roadie}>Loading availability...</div>
+            ) : (
+              <>
+                <div style={styles.sharedPanel}>
+                  <p style={styles.kicker}>BEST PRACTICE WINDOWS</p>
+
+                  {sharedAvailability.length === 0 ? (
+                    <p style={styles.sectionSubtitle}>
+                      No 3+ member matching time slots yet. Once at least 3 band
+                      members submit the exact same time window, it will show here.
+                    </p>
+                  ) : (
+                    <div style={styles.sharedGrid}>
+                      {sharedAvailability.map((slot, index) => (
+                        <div key={index} style={styles.sharedCard}>
+                          <p style={styles.sectionValue}>3+ MEMBERS FREE</p>
+
+                          <h2 style={styles.sectionTitle}>{slot.dayLabel}</h2>
+
+                          <p style={styles.sectionSubtitle}>
+                            {formatTimeLabel(slot.start)} -{" "}
+                            {formatTimeLabel(slot.end)}
+                          </p>
+
+                          <p style={styles.memberList}>
+                            {slot.members.join(", ")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.memberAvailabilityList}>
+                  {bandAvailability.length === 0 ? (
+                    <div style={styles.roadie}>No one has submitted yet.</div>
+                  ) : (
+                    bandAvailability.map((member) => (
+                      <div key={member.id} style={styles.memberCard}>
+                        <h2 style={styles.sectionTitle}>
+                          {member.displayName || member.email}
+                        </h2>
+
+                        <div style={styles.memberDaysGrid}>
+                          {weekDays.map((day) => {
+                            const dayData = member.days?.[day.key];
+
+                            return (
+                              <div key={day.key} style={styles.memberDayCard}>
+                                <p
+                                  style={{
+                                    ...styles.sectionValue,
+                                    color:
+                                      dayData?.available === true
+                                        ? "#00ff78"
+                                        : dayData?.available === false
+                                        ? "#ff2a2a"
+                                        : "#777",
+                                  }}
+                                >
+                                  {dayData?.available === true
+                                    ? "AVAILABLE"
+                                    : dayData?.available === false
+                                    ? "NOT AVAILABLE"
+                                    : "NOT SET"}
+                                </p>
+
+                                <h3 style={styles.memberDayTitle}>
+                                  {day.label}
+                                </h3>
+
+                                <p style={styles.sectionSubtitle}>
+                                  {dayData?.slots?.length
+                                    ? dayData.slots
+                                        .map(
+                                          (slot) =>
+                                            `${formatTimeLabel(
+                                              slot.start
+                                            )} - ${formatTimeLabel(slot.end)}`
+                                        )
+                                        .join(", ")
+                                    : "—"}
+                                </p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {view === "settings" && (
@@ -567,6 +1248,8 @@ function BandPage({ band, goHome }) {
                   setBandName(band.name);
                   setLogoFile(null);
                 }}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
               >
                 BACK TO BAND
               </button>
@@ -606,6 +1289,8 @@ function BandPage({ band, goHome }) {
                   style={styles.primaryButton}
                   onClick={handleSaveSettings}
                   disabled={saving}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
                 >
                   {saving ? "SAVING..." : "SAVE SETTINGS"}
                 </button>
@@ -613,6 +1298,8 @@ function BandPage({ band, goHome }) {
                 <button
                   style={styles.secondaryButton}
                   onClick={() => setInviteCode(generateInviteCode())}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
                 >
                   REGENERATE CODE
                 </button>
@@ -746,6 +1433,9 @@ const styles = {
     outline: "none",
     width: "100%",
     boxSizing: "border-box",
+    transition: "0.25s ease",
+    cursor: "pointer",
+    boxShadow: "0 0 0 rgba(255,0,0,0)",
   },
 
   fileLabel: {
@@ -758,13 +1448,16 @@ const styles = {
   primaryButton: {
     padding: "16px",
     borderRadius: 12,
-    border: "none",
+    border: "1px solid rgba(255,0,21,0.6)",
     background: "#ff0015",
     color: "white",
     fontWeight: 900,
     cursor: "pointer",
     textTransform: "uppercase",
     letterSpacing: 1,
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+    boxShadow: "0 14px 35px rgba(0,0,0,0.35)",
   },
 
   secondaryButton: {
@@ -775,6 +1468,22 @@ const styles = {
     color: "white",
     fontWeight: 800,
     cursor: "pointer",
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+    boxShadow: "0 14px 35px rgba(0,0,0,0.35)",
+  },
+
+  dangerButton: {
+    padding: "14px 18px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,0,0,0.3)",
+    background: "rgba(255,0,0,0.14)",
+    color: "white",
+    fontWeight: 900,
+    cursor: "pointer",
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+    boxShadow: "0 14px 35px rgba(0,0,0,0.35)",
   },
 
   googleButton: {
@@ -851,7 +1560,7 @@ const styles = {
     transition: "0.25s ease",
     transform: "translateY(0px) scale(1)",
     cursor: "pointer",
-    boxShadow: "0 25px 60px rgba(0,0,0,0.75)",
+    boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
   },
 
   bandLogo: {
@@ -883,13 +1592,18 @@ const styles = {
   },
 
   backButton: {
-    background: "transparent",
+    background: "rgba(255,255,255,0.04)",
     color: "white",
-    border: "none",
+    border: "1px solid rgba(255,255,255,0.16)",
+    borderRadius: 14,
+    padding: "12px 16px",
     fontSize: 22,
     fontWeight: 900,
     cursor: "pointer",
     marginBottom: 28,
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+    boxShadow: "0 14px 35px rgba(0,0,0,0.35)",
   },
 
   bandDashboardHero: {
@@ -918,6 +1632,9 @@ const styles = {
     color: "white",
     fontSize: 24,
     cursor: "pointer",
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+    boxShadow: "0 14px 35px rgba(0,0,0,0.35)",
   },
 
   settingsPage: {
@@ -1017,6 +1734,8 @@ const styles = {
     borderRadius: 24,
     padding: 24,
     boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
   },
 
   sectionValue: {
@@ -1040,5 +1759,119 @@ const styles = {
     opacity: 0.68,
     lineHeight: 1.5,
     fontWeight: 700,
+  },
+
+  availabilityPage: {
+    width: "100%",
+    maxWidth: 1100,
+    margin: "0 auto",
+  },
+
+  availabilityMenuGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 22,
+    marginTop: 34,
+  },
+
+  availabilityMenuCard: {
+    minHeight: 220,
+    background: "rgba(10,10,10,0.84)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 24,
+    padding: 26,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+    cursor: "pointer",
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+  },
+
+  weekGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 14,
+    marginTop: 34,
+  },
+
+  dayCard: {
+    minHeight: 180,
+    background: "rgba(10,10,10,0.84)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 22,
+    padding: 18,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+    cursor: "pointer",
+    transition: "0.25s ease",
+    transform: "translateY(0px) scale(1)",
+  },
+
+  timeSlotRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr auto",
+    gap: 12,
+    alignItems: "center",
+  },
+
+  sharedPanel: {
+    background: "rgba(10,10,10,0.84)",
+    border: "1px solid rgba(0,255,120,0.24)",
+    borderRadius: 24,
+    padding: 26,
+    boxShadow: "0 25px 80px rgba(0,0,0,0.65)",
+    marginBottom: 28,
+  },
+
+  sharedGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, 1fr)",
+    gap: 18,
+    marginTop: 20,
+  },
+
+  sharedCard: {
+    background: "rgba(0,255,120,0.08)",
+    border: "1px solid rgba(0,255,120,0.32)",
+    borderRadius: 20,
+    padding: 20,
+  },
+
+  memberList: {
+    marginTop: 12,
+    opacity: 0.82,
+    fontWeight: 800,
+    lineHeight: 1.5,
+  },
+
+  memberAvailabilityList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 20,
+  },
+
+  memberCard: {
+    background: "rgba(10,10,10,0.84)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 24,
+    padding: 24,
+  },
+
+  memberDaysGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(7, 1fr)",
+    gap: 12,
+    marginTop: 16,
+  },
+
+  memberDayCard: {
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 16,
+    padding: 14,
+  },
+
+  memberDayTitle: {
+    margin: "10px 0 8px",
+    fontSize: 18,
+    textTransform: "uppercase",
   },
 };
