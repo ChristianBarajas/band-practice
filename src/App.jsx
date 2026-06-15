@@ -13,7 +13,9 @@ import {
 
 import {
   addDoc,
+  arrayUnion,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -81,6 +83,30 @@ function formatTimeLabel(time) {
   const displayHour = hour % 12 || 12;
 
   return `${displayHour}:${minute} ${ampm}`;
+}
+
+function formatShowDate(dateString) {
+  if (!dateString) return "Date TBD";
+
+  const date = new Date(`${dateString}T00:00:00`);
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getNextShow(shows) {
+  if (!shows.length) return null;
+
+  const todayKey = formatDateKey(new Date());
+  const upcoming = shows.filter((show) => show.date >= todayKey);
+
+  if (upcoming.length) return upcoming[0];
+
+  return shows[shows.length - 1];
 }
 
 function getAvailabilityWeekDays() {
@@ -361,6 +387,9 @@ function VerifyPage({ user }) {
 function HomePage({ user, refreshKey, goCreateBand, openBand }) {
   const [bands, setBands] = useState([]);
   const [loadingBands, setLoadingBands] = useState(true);
+  const [showJoinBand, setShowJoinBand] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joiningBand, setJoiningBand] = useState(false);
 
   const loadBands = async () => {
     try {
@@ -391,6 +420,59 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
     loadBands();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
+
+  const handleJoinBand = async () => {
+    const code = joinCode.trim().toUpperCase();
+
+    if (!code) return alert("Invite code required.");
+
+    try {
+      setJoiningBand(true);
+
+      const q = query(collection(db, "bands"), where("inviteCode", "==", code));
+      const snap = await getDocs(q);
+
+      if (snap.empty) {
+        alert("No band found with that invite code.");
+        return;
+      }
+
+      const bandDoc = snap.docs[0];
+      const bandData = bandDoc.data();
+
+      if (bandData.memberIds?.includes(user.uid)) {
+        alert(`You're already in ${bandData.name}.`);
+        setJoinCode("");
+        setShowJoinBand(false);
+        await loadBands();
+        return;
+      }
+
+      await updateDoc(doc(db, "bands", bandDoc.id), {
+        memberIds: arrayUnion(user.uid),
+        updatedAt: serverTimestamp(),
+      });
+
+      await setDoc(
+        doc(db, "users", user.uid, "bands", bandDoc.id),
+        {
+          bandId: bandDoc.id,
+          joinedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      alert(`Joined ${bandData.name}!`);
+      setJoinCode("");
+      setShowJoinBand(false);
+      await loadBands();
+    } catch (err) {
+      console.error("Error joining band:", err);
+      alert(err.message);
+    } finally {
+      setJoiningBand(false);
+    }
+  };
 
   return (
     <div style={styles.page}>
@@ -430,12 +512,62 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
 
           <button
             style={styles.secondaryButton}
+            onClick={() => setShowJoinBand((prev) => !prev)}
             onMouseEnter={addButtonHover}
             onMouseLeave={removeButtonHover}
           >
             JOIN BAND
           </button>
         </div>
+
+        {showJoinBand && (
+          <div style={styles.joinBandPanel}>
+            <div>
+              <p style={styles.kicker}>INVITE CODE</p>
+              <h2 style={styles.sectionTitle}>Join a Band</h2>
+              <p style={styles.sectionSubtitle}>
+                Enter the invite code your bandmate shared. Codes are not case-sensitive.
+              </p>
+            </div>
+
+            <div style={styles.joinBandRow}>
+              <input
+                style={styles.input}
+                placeholder="Example: ABC123"
+                value={joinCode}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleJoinBand();
+                }}
+              />
+
+              <button
+                style={styles.primaryButton}
+                onClick={handleJoinBand}
+                disabled={joiningBand}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                {joiningBand ? "JOINING..." : "JOIN"}
+              </button>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => {
+                  setJoinCode("");
+                  setShowJoinBand(false);
+                }}
+                disabled={joiningBand}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        )}
 
         {loadingBands ? (
           <div style={styles.roadie}>Loading bands...</div>
@@ -499,7 +631,6 @@ function CreateBandPage({ user, goHome }) {
 
       await setDoc(doc(db, "users", user.uid, "bands", bandRef.id), {
         bandId: bandRef.id,
-        role: "leader",
         joinedAt: serverTimestamp(),
       });
 
@@ -580,8 +711,384 @@ function BandPage({ user, band, goHome }) {
   const [availabilityDraft, setAvailabilityDraft] = useState({});
   const [bandAvailability, setBandAvailability] = useState([]);
   const [loadingBandAvailability, setLoadingBandAvailability] = useState(false);
+  const [shows, setShows] = useState([]);
+  const [loadingShows, setLoadingShows] = useState(false);
+  const [showForm, setShowForm] = useState({
+    title: "",
+    date: "",
+    location: "",
+    callTime: "",
+    songs: "",
+    instagramLink: "",
+  });
+  const [editingShowId, setEditingShowId] = useState(null);
+
+  const [goals, setGoals] = useState([]);
+  const [loadingGoals, setLoadingGoals] = useState(false);
+  const [goalForm, setGoalForm] = useState({
+    title: "",
+    description: "",
+    why: "",
+    how: "",
+    deadline: "",
+  });
+  const [editingGoalId, setEditingGoalId] = useState(null);
+
+  const [practices, setPractices] = useState([]);
+  const [loadingPractices, setLoadingPractices] = useState(false);
+  const [practiceForm, setPracticeForm] = useState({
+    title: "",
+    date: "",
+    location: "",
+    goal: "",
+  });
+  const [editingPracticeId, setEditingPracticeId] = useState(null);
 
   const sharedAvailability = getSharedAvailability(bandAvailability, weekDays);
+  const nextShow = getNextShow(shows);
+  const nextGoal = goals[0] || null;
+  const nextPractice = practices[0] || null;
+
+  const loadShows = async () => {
+    try {
+      setLoadingShows(true);
+
+      const snap = await getDocs(collection(db, "bands", band.id, "shows"));
+
+      const loadedShows = snap.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .sort((a, b) => {
+          if (!a.date && !b.date) return 0;
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return a.date.localeCompare(b.date);
+        });
+
+      setShows(loadedShows);
+    } catch (err) {
+      console.error("Error loading shows:", err);
+      alert(err.message);
+    } finally {
+      setLoadingShows(false);
+    }
+  };
+
+  const resetShowForm = () => {
+    setShowForm({
+      title: "",
+      date: "",
+      location: "",
+      callTime: "",
+      songs: "",
+      instagramLink: "",
+    });
+    setEditingShowId(null);
+  };
+
+  const startEditShow = (show) => {
+    setEditingShowId(show.id);
+    setShowForm({
+      title: show.title || "",
+      date: show.date || "",
+      location: show.location || "",
+      callTime: show.callTime || "",
+      songs: Array.isArray(show.songs) ? show.songs.join("\n") : "",
+      instagramLink: show.instagramLink || "",
+    });
+    setView("addShow");
+  };
+
+  const deleteShow = async (show) => {
+    const confirmed = window.confirm(
+      `Delete "${show.title}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setSaving(true);
+      await deleteDoc(doc(db, "bands", band.id, "shows", show.id));
+      await loadShows();
+      alert("Show deleted.");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveShow = async () => {
+    if (!showForm.title.trim()) return alert("Show name required.");
+    if (!showForm.date) return alert("Show date required.");
+    if (!showForm.location.trim()) return alert("Show location required.");
+
+    try {
+      setSaving(true);
+
+      const showData = {
+        bandId: band.id,
+        title: showForm.title.trim(),
+        date: showForm.date,
+        location: showForm.location.trim(),
+        callTime: showForm.callTime,
+        songs: showForm.songs
+          .split("\n")
+          .map((song) => song.trim())
+          .filter(Boolean),
+        instagramLink: showForm.instagramLink.trim(),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editingShowId) {
+        await updateDoc(doc(db, "bands", band.id, "shows", editingShowId), showData);
+      } else {
+        await addDoc(collection(db, "bands", band.id, "shows"), {
+          ...showData,
+          createdBy: user.uid,
+          createdByName: user.displayName || user.email,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      const wasEditing = Boolean(editingShowId);
+
+      resetShowForm();
+      await loadShows();
+      setView("showsHome");
+      alert(wasEditing ? "Show updated!" : "Show added!");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadGoals = async () => {
+    try {
+      setLoadingGoals(true);
+
+      const snap = await getDocs(collection(db, "bands", band.id, "goals"));
+
+      const loadedGoals = snap.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .sort((a, b) => {
+          if (!a.deadline && !b.deadline) return 0;
+          if (!a.deadline) return 1;
+          if (!b.deadline) return -1;
+          return a.deadline.localeCompare(b.deadline);
+        });
+
+      setGoals(loadedGoals);
+    } catch (err) {
+      console.error("Error loading goals:", err);
+      alert(err.message);
+    } finally {
+      setLoadingGoals(false);
+    }
+  };
+
+  const resetGoalForm = () => {
+    setGoalForm({
+      title: "",
+      description: "",
+      why: "",
+      how: "",
+      deadline: "",
+    });
+    setEditingGoalId(null);
+  };
+
+  const startEditGoal = (goal) => {
+    setEditingGoalId(goal.id);
+    setGoalForm({
+      title: goal.title || "",
+      description: goal.description || "",
+      why: goal.why || "",
+      how: goal.how || "",
+      deadline: goal.deadline || "",
+    });
+    setView("addGoal");
+  };
+
+  const deleteGoal = async (goal) => {
+    const confirmed = window.confirm(
+      `Delete "${goal.title}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setSaving(true);
+      await deleteDoc(doc(db, "bands", band.id, "goals", goal.id));
+      await loadGoals();
+      alert("Goal deleted.");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveGoal = async () => {
+    if (!goalForm.title.trim()) return alert("Goal title required.");
+    if (!goalForm.deadline) return alert("Goal deadline required.");
+
+    try {
+      setSaving(true);
+
+      const goalData = {
+        bandId: band.id,
+        title: goalForm.title.trim(),
+        description: goalForm.description.trim(),
+        why: goalForm.why.trim(),
+        how: goalForm.how.trim(),
+        deadline: goalForm.deadline,
+        completed: false,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editingGoalId) {
+        await updateDoc(doc(db, "bands", band.id, "goals", editingGoalId), goalData);
+      } else {
+        await addDoc(collection(db, "bands", band.id, "goals"), {
+          ...goalData,
+          createdBy: user.uid,
+          createdByName: user.displayName || user.email,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      const wasEditing = Boolean(editingGoalId);
+
+      resetGoalForm();
+      await loadGoals();
+      setView("goalsHome");
+      alert(wasEditing ? "Goal updated!" : "Goal added!");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const loadPractices = async () => {
+    try {
+      setLoadingPractices(true);
+
+      const snap = await getDocs(collection(db, "bands", band.id, "practices"));
+
+      const todayKey = formatDateKey(new Date());
+      const loadedPractices = snap.docs
+        .map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }))
+        .filter((practice) => !practice.date || practice.date >= todayKey)
+        .sort((a, b) => {
+          if (!a.date && !b.date) return 0;
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return a.date.localeCompare(b.date);
+        });
+
+      setPractices(loadedPractices);
+    } catch (err) {
+      console.error("Error loading practices:", err);
+      alert(err.message);
+    } finally {
+      setLoadingPractices(false);
+    }
+  };
+
+  const resetPracticeForm = () => {
+    setPracticeForm({
+      title: "",
+      date: "",
+      location: "",
+      goal: "",
+    });
+    setEditingPracticeId(null);
+  };
+
+  const startEditPractice = (practice) => {
+    setEditingPracticeId(practice.id);
+    setPracticeForm({
+      title: practice.title || "",
+      date: practice.date || "",
+      location: practice.location || "",
+      goal: practice.goal || "",
+    });
+    setView("addPractice");
+  };
+
+  const deletePractice = async (practice) => {
+    const confirmed = window.confirm(
+      `Delete "${practice.title}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setSaving(true);
+      await deleteDoc(doc(db, "bands", band.id, "practices", practice.id));
+      await loadPractices();
+      alert("Practice deleted.");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const savePractice = async () => {
+    if (!practiceForm.title.trim()) return alert("Practice title required.");
+    if (!practiceForm.date) return alert("Practice date required.");
+    if (!practiceForm.location.trim()) return alert("Practice location required.");
+
+    try {
+      setSaving(true);
+
+      const practiceData = {
+        bandId: band.id,
+        title: practiceForm.title.trim(),
+        date: practiceForm.date,
+        location: practiceForm.location.trim(),
+        goal: practiceForm.goal.trim(),
+        updatedAt: serverTimestamp(),
+      };
+
+      if (editingPracticeId) {
+        await updateDoc(
+          doc(db, "bands", band.id, "practices", editingPracticeId),
+          practiceData
+        );
+      } else {
+        await addDoc(collection(db, "bands", band.id, "practices"), {
+          ...practiceData,
+          createdBy: user.uid,
+          createdByName: user.displayName || user.email,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      const wasEditing = Boolean(editingPracticeId);
+
+      resetPracticeForm();
+      await loadPractices();
+      setView("practicesHome");
+      alert(wasEditing ? "Practice updated!" : "Practice added!");
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const loadMyAvailability = async () => {
     try {
@@ -658,6 +1165,13 @@ function BandPage({ user, band, goHome }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [band.id, user.uid, weekId]);
 
+  useEffect(() => {
+    loadShows();
+    loadGoals();
+    loadPractices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [band.id]);
+
   const handleSaveSettings = async () => {
     if (!bandName.trim()) return alert("Band name required.");
 
@@ -704,8 +1218,12 @@ function BandPage({ user, band, goHome }) {
   const dashboardSections = [
     {
       title: "Upcoming Shows",
-      subtitle: "Track gigs, venues, call times, and set times.",
-      value: "No shows yet",
+      subtitle: nextShow
+        ? `${formatShowDate(nextShow.date)} • ${nextShow.location} • Call time ${
+            nextShow.callTime ? formatTimeLabel(nextShow.callTime) : "TBD"
+          }`
+        : "Track gigs, venues, call times, and set times.",
+      value: nextShow ? "Next show" : "No shows yet",
     },
     {
       title: "My Availability",
@@ -714,13 +1232,17 @@ function BandPage({ user, band, goHome }) {
     },
     {
       title: "Band Goals",
-      subtitle: "EP deadlines, live show targets, recording plans.",
-      value: "Coming soon",
+      subtitle: nextGoal
+        ? `${nextGoal.title} • Deadline ${formatShowDate(nextGoal.deadline)}`
+        : "EP deadlines, live show targets, recording plans.",
+      value: nextGoal ? `${goals.length} active goal${goals.length === 1 ? "" : "s"}` : "No goals yet",
     },
     {
       title: "Upcoming Practices",
-      subtitle: "See confirmed practices and proposed jam times.",
-      value: "No practices yet",
+      subtitle: nextPractice
+        ? `${formatShowDate(nextPractice.date)} • ${nextPractice.location}`
+        : "See confirmed practices and proposed jam times.",
+      value: nextPractice ? "Next practice" : "No practices yet",
     },
   ];
 
@@ -773,11 +1295,28 @@ function BandPage({ user, band, goHome }) {
                     style={{
                       ...styles.dashboardSectionCard,
                       cursor:
-                        section.title === "My Availability" ? "pointer" : "default",
+                        section.title === "My Availability" ||
+                        section.title === "Upcoming Shows" ||
+                        section.title === "Band Goals" ||
+                        section.title === "Upcoming Practices"
+                          ? "pointer"
+                          : "default",
                     }}
                     onClick={() => {
                       if (section.title === "My Availability") {
                         setView("availabilityHome");
+                      }
+
+                      if (section.title === "Upcoming Shows") {
+                        setView("showsHome");
+                      }
+
+                      if (section.title === "Band Goals") {
+                        setView("goalsHome");
+                      }
+
+                      if (section.title === "Upcoming Practices") {
+                        setView("practicesHome");
                       }
                     }}
                     onMouseEnter={addHoverLift}
@@ -791,6 +1330,594 @@ function BandPage({ user, band, goHome }) {
               </div>
             </div>
           </>
+        )}
+
+        {view === "showsHome" && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>GIG BOARD</p>
+                <h1 style={styles.bandPageTitle}>Upcoming Shows</h1>
+              </div>
+
+              <div style={styles.settingsActions}>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => {
+                    resetShowForm();
+                    setView("addShow");
+                  }}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
+                >
+                  + ADD SHOW
+                </button>
+
+                <button
+                  style={styles.secondaryButton}
+                  onClick={() => setView("dashboard")}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
+                >
+                  BACK TO BAND
+                </button>
+              </div>
+            </div>
+
+            {loadingShows ? (
+              <div style={styles.roadie}>Loading shows...</div>
+            ) : shows.length === 0 ? (
+              <div style={styles.sharedPanel}>
+                <p style={styles.kicker}>NO SHOWS YET</p>
+                <h2 style={styles.sectionTitle}>Start the gig list</h2>
+                <p style={styles.sectionSubtitle}>
+                  Add the next show date, location, call time, setlist, and
+                  Instagram link.
+                </p>
+              </div>
+            ) : (
+              <div style={styles.showsGrid}>
+                {shows.map((show) => (
+                  <div key={show.id} style={styles.showCard}>
+                    <p style={styles.sectionValue}>{formatShowDate(show.date)}</p>
+                    <h2 style={styles.sectionTitle}>{show.title}</h2>
+
+                    <p style={styles.sectionSubtitle}>
+                      <strong>Location:</strong> {show.location}
+                    </p>
+
+                    <p style={styles.sectionSubtitle}>
+                      <strong>Call Time:</strong>{" "}
+                      {show.callTime ? formatTimeLabel(show.callTime) : "TBD"}
+                    </p>
+
+                    {show.songs?.length > 0 && (
+                      <div style={styles.songList}>
+                        <p style={styles.kicker}>SETLIST</p>
+                        {show.songs.map((song, index) => (
+                          <p key={index} style={styles.songItem}>
+                            {index + 1}. {song}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {show.instagramLink && (
+                      <a
+                        style={styles.linkButton}
+                        href={show.instagramLink}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        OPEN INSTAGRAM LINK
+                      </a>
+                    )}
+
+                    <div style={styles.showActions}>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => startEditShow(show)}
+                        disabled={saving}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        EDIT
+                      </button>
+
+                      <button
+                        style={styles.dangerButton}
+                        onClick={() => deleteShow(show)}
+                        disabled={saving}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        DELETE
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === "addShow" && (
+          <div style={styles.settingsPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>{editingShowId ? "EDIT SHOW" : "NEW SHOW"}</p>
+                <h1 style={styles.bandPageTitle}>
+                  {editingShowId ? "Edit Show" : "Add Show"}
+                </h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => {
+                  resetShowForm();
+                  setView("showsHome");
+                }}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK
+              </button>
+            </div>
+
+            <div style={styles.settingsPanel}>
+              <input
+                style={styles.input}
+                placeholder="Show name / event title"
+                value={showForm.title}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setShowForm((prev) => ({ ...prev, title: e.target.value }))
+                }
+              />
+
+              <label style={styles.fileLabel}>Show Date</label>
+              <input
+                style={styles.input}
+                type="date"
+                value={showForm.date}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setShowForm((prev) => ({ ...prev, date: e.target.value }))
+                }
+              />
+
+              <input
+                style={styles.input}
+                placeholder="Location / venue"
+                value={showForm.location}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setShowForm((prev) => ({ ...prev, location: e.target.value }))
+                }
+              />
+
+              <label style={styles.fileLabel}>Call Time</label>
+              <input
+                style={styles.input}
+                type="time"
+                value={showForm.callTime}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setShowForm((prev) => ({ ...prev, callTime: e.target.value }))
+                }
+              />
+
+              <textarea
+                style={styles.textarea}
+                placeholder={"Songs you're gonna play. Put one song per line."}
+                value={showForm.songs}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setShowForm((prev) => ({ ...prev, songs: e.target.value }))
+                }
+              />
+
+              <input
+                style={styles.input}
+                placeholder="Instagram show link"
+                value={showForm.instagramLink}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setShowForm((prev) => ({
+                    ...prev,
+                    instagramLink: e.target.value,
+                  }))
+                }
+              />
+
+              <button
+                style={styles.primaryButton}
+                onClick={saveShow}
+                disabled={saving}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                {saving ? "SAVING..." : editingShowId ? "SAVE CHANGES" : "ADD SHOW"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === "goalsHome" && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>BAND MISSION</p>
+                <h1 style={styles.bandPageTitle}>Band Goals</h1>
+              </div>
+
+              <div style={styles.settingsActions}>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => {
+                    resetGoalForm();
+                    setView("addGoal");
+                  }}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
+                >
+                  + ADD GOAL
+                </button>
+
+                <button
+                  style={styles.secondaryButton}
+                  onClick={() => setView("dashboard")}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
+                >
+                  BACK TO BAND
+                </button>
+              </div>
+            </div>
+
+            {loadingGoals ? (
+              <div style={styles.roadie}>Loading goals...</div>
+            ) : goals.length === 0 ? (
+              <div style={styles.sharedPanel}>
+                <p style={styles.kicker}>NO GOALS YET</p>
+                <h2 style={styles.sectionTitle}>Add the first mission</h2>
+                <p style={styles.sectionSubtitle}>
+                  Create goals for releases, shows, recording, practice focus, or anything
+                  the band needs to lock in.
+                </p>
+              </div>
+            ) : (
+              <div style={styles.showsGrid}>
+                {goals.map((goal) => (
+                  <div key={goal.id} style={styles.showCard}>
+                    <p style={styles.sectionValue}>
+                      Deadline {formatShowDate(goal.deadline)}
+                    </p>
+
+                    <h2 style={styles.sectionTitle}>{goal.title}</h2>
+
+                    {goal.description && (
+                      <p style={styles.sectionSubtitle}>
+                        <strong>Description:</strong> {goal.description}
+                      </p>
+                    )}
+
+                    {goal.why && (
+                      <div style={styles.songList}>
+                        <p style={styles.kicker}>WHY</p>
+                        <p style={styles.songItem}>{goal.why}</p>
+                      </div>
+                    )}
+
+                    {goal.how && (
+                      <div style={styles.songList}>
+                        <p style={styles.kicker}>HOW</p>
+                        <p style={styles.songItem}>{goal.how}</p>
+                      </div>
+                    )}
+
+                    <div style={styles.showActions}>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => startEditGoal(goal)}
+                        disabled={saving}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        EDIT
+                      </button>
+
+                      <button
+                        style={styles.dangerButton}
+                        onClick={() => deleteGoal(goal)}
+                        disabled={saving}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        DELETE
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === "addGoal" && (
+          <div style={styles.settingsPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>{editingGoalId ? "EDIT GOAL" : "NEW GOAL"}</p>
+                <h1 style={styles.bandPageTitle}>
+                  {editingGoalId ? "Edit Goal" : "Add Goal"}
+                </h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => {
+                  resetGoalForm();
+                  setView("goalsHome");
+                }}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK
+              </button>
+            </div>
+
+            <div style={styles.settingsPanel}>
+              <input
+                style={styles.input}
+                placeholder="Goal title"
+                value={goalForm.title}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setGoalForm((prev) => ({ ...prev, title: e.target.value }))
+                }
+              />
+
+              <textarea
+                style={styles.textarea}
+                placeholder="Description — what is the goal?"
+                value={goalForm.description}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setGoalForm((prev) => ({ ...prev, description: e.target.value }))
+                }
+              />
+
+              <textarea
+                style={styles.textarea}
+                placeholder="Why does this matter?"
+                value={goalForm.why}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setGoalForm((prev) => ({ ...prev, why: e.target.value }))
+                }
+              />
+
+              <textarea
+                style={styles.textarea}
+                placeholder="How are we going to make it happen?"
+                value={goalForm.how}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setGoalForm((prev) => ({ ...prev, how: e.target.value }))
+                }
+              />
+
+              <label style={styles.fileLabel}>Deadline</label>
+              <input
+                style={styles.input}
+                type="date"
+                value={goalForm.deadline}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setGoalForm((prev) => ({ ...prev, deadline: e.target.value }))
+                }
+              />
+
+              <button
+                style={styles.primaryButton}
+                onClick={saveGoal}
+                disabled={saving}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                {saving ? "SAVING..." : editingGoalId ? "SAVE CHANGES" : "ADD GOAL"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === "practicesHome" && (
+          <div style={styles.availabilityPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>LOCK IT IN</p>
+                <h1 style={styles.bandPageTitle}>Upcoming Practices</h1>
+              </div>
+
+              <div style={styles.settingsActions}>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => {
+                    resetPracticeForm();
+                    setView("addPractice");
+                  }}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
+                >
+                  + ADD PRACTICE
+                </button>
+
+                <button
+                  style={styles.secondaryButton}
+                  onClick={() => setView("dashboard")}
+                  onMouseEnter={addButtonHover}
+                  onMouseLeave={removeButtonHover}
+                >
+                  BACK TO BAND
+                </button>
+              </div>
+            </div>
+
+            {loadingPractices ? (
+              <div style={styles.roadie}>Loading practices...</div>
+            ) : practices.length === 0 ? (
+              <div style={styles.sharedPanel}>
+                <p style={styles.kicker}>NO PRACTICES YET</p>
+                <h2 style={styles.sectionTitle}>Add a hard practice</h2>
+                <p style={styles.sectionSubtitle}>
+                  Lock in the date, title, location, and focus goal so nobody has to
+                  dig through the group chat.
+                </p>
+              </div>
+            ) : (
+              <div style={styles.showsGrid}>
+                {practices.map((practice) => (
+                  <div key={practice.id} style={styles.showCard}>
+                    <p style={styles.sectionValue}>{formatShowDate(practice.date)}</p>
+                    <h2 style={styles.sectionTitle}>{practice.title}</h2>
+
+                    <p style={styles.sectionSubtitle}>
+                      <strong>Location:</strong> {practice.location}
+                    </p>
+
+                    {practice.goal && (
+                      <div style={styles.songList}>
+                        <p style={styles.kicker}>PRACTICE GOAL</p>
+                        <p style={styles.songItem}>{practice.goal}</p>
+                      </div>
+                    )}
+
+                    <div style={styles.showActions}>
+                      <button
+                        style={styles.secondaryButton}
+                        onClick={() => startEditPractice(practice)}
+                        disabled={saving}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        EDIT
+                      </button>
+
+                      <button
+                        style={styles.dangerButton}
+                        onClick={() => deletePractice(practice)}
+                        disabled={saving}
+                        onMouseEnter={addButtonHover}
+                        onMouseLeave={removeButtonHover}
+                      >
+                        DELETE
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === "addPractice" && (
+          <div style={styles.settingsPage}>
+            <div style={styles.settingsHeader}>
+              <div>
+                <p style={styles.kicker}>
+                  {editingPracticeId ? "EDIT PRACTICE" : "NEW PRACTICE"}
+                </p>
+                <h1 style={styles.bandPageTitle}>
+                  {editingPracticeId ? "Edit Practice" : "Add Practice"}
+                </h1>
+              </div>
+
+              <button
+                style={styles.secondaryButton}
+                onClick={() => {
+                  resetPracticeForm();
+                  setView("practicesHome");
+                }}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                BACK
+              </button>
+            </div>
+
+            <div style={styles.settingsPanel}>
+              <input
+                style={styles.input}
+                placeholder="Practice title"
+                value={practiceForm.title}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setPracticeForm((prev) => ({ ...prev, title: e.target.value }))
+                }
+              />
+
+              <label style={styles.fileLabel}>Practice Date</label>
+              <input
+                style={styles.input}
+                type="date"
+                value={practiceForm.date}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setPracticeForm((prev) => ({ ...prev, date: e.target.value }))
+                }
+              />
+
+              <input
+                style={styles.input}
+                placeholder="Location"
+                value={practiceForm.location}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setPracticeForm((prev) => ({ ...prev, location: e.target.value }))
+                }
+              />
+
+              <textarea
+                style={styles.textarea}
+                placeholder="Goal for this practice"
+                value={practiceForm.goal}
+                onMouseEnter={addInputHover}
+                onMouseLeave={removeInputHover}
+                onChange={(e) =>
+                  setPracticeForm((prev) => ({ ...prev, goal: e.target.value }))
+                }
+              />
+
+              <button
+                style={styles.primaryButton}
+                onClick={savePractice}
+                disabled={saving}
+                onMouseEnter={addButtonHover}
+                onMouseLeave={removeButtonHover}
+              >
+                {saving
+                  ? "SAVING..."
+                  : editingPracticeId
+                  ? "SAVE CHANGES"
+                  : "ADD PRACTICE"}
+              </button>
+            </div>
+          </div>
         )}
 
         {view === "availabilityHome" && (
@@ -843,13 +1970,14 @@ function BandPage({ user, band, goHome }) {
 
               <div
                 style={styles.availabilityMenuCard}
+                onClick={() => setView("practicesHome")}
                 onMouseEnter={addHoverLift}
                 onMouseLeave={removeHoverLift}
               >
-                <p style={styles.sectionValue}>LEADER TOOL</p>
+                <p style={styles.sectionValue}>BAND TOOL</p>
                 <h2 style={styles.sectionTitle}>Schedule Practice</h2>
                 <p style={styles.sectionSubtitle}>
-                  Coming soon: lock in a hard practice date.
+                  Lock in a hard practice date, location, and goal.
                 </p>
               </div>
             </div>
@@ -1534,6 +2662,27 @@ const styles = {
     marginBottom: 50,
   },
 
+  joinBandPanel: {
+    maxWidth: 820,
+    marginBottom: 42,
+    background: "rgba(10,10,10,0.86)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    boxShadow: "0 25px 80px rgba(0,0,0,0.65)",
+    backdropFilter: "blur(10px)",
+    borderRadius: 24,
+    padding: 26,
+    display: "flex",
+    flexDirection: "column",
+    gap: 18,
+  },
+
+  joinBandRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr auto auto",
+    gap: 12,
+    alignItems: "center",
+  },
+
   roadie: {
     marginTop: 120,
     textAlign: "center",
@@ -1759,6 +2908,74 @@ const styles = {
     opacity: 0.68,
     lineHeight: 1.5,
     fontWeight: 700,
+  },
+
+  showsGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: 22,
+    marginTop: 34,
+  },
+
+  showCard: {
+    background: "rgba(10,10,10,0.84)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 24,
+    padding: 26,
+    boxShadow: "0 20px 60px rgba(0,0,0,0.55)",
+  },
+
+  songList: {
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 18,
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+  },
+
+  songItem: {
+    margin: "8px 0",
+    opacity: 0.86,
+    fontWeight: 800,
+  },
+
+  showActions: {
+    display: "flex",
+    gap: 12,
+    flexWrap: "wrap",
+    marginTop: 18,
+  },
+
+  textarea: {
+    minHeight: 140,
+    resize: "vertical",
+    padding: "16px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.16)",
+    background: "rgba(255,255,255,0.08)",
+    color: "white",
+    fontSize: 15,
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+    transition: "0.25s ease",
+    cursor: "pointer",
+    boxShadow: "0 0 0 rgba(255,0,0,0)",
+    fontFamily: "inherit",
+  },
+
+  linkButton: {
+    display: "inline-block",
+    marginTop: 18,
+    padding: "14px 18px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,0,21,0.6)",
+    background: "rgba(255,0,21,0.16)",
+    color: "white",
+    fontWeight: 900,
+    textDecoration: "none",
+    textTransform: "uppercase",
+    letterSpacing: 1,
   },
 
   availabilityPage: {
