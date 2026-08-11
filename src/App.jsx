@@ -31,15 +31,17 @@ import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 async function saveUserProfile(user, extraData = {}) {
   if (!user) return;
 
+  const typedFullName = `${extraData.firstName || ""} ${
+    extraData.lastName || ""
+  }`.trim();
+
   await setDoc(
     doc(db, "users", user.uid),
     {
       uid: user.uid,
       firstName: extraData.firstName || "",
       lastName: extraData.lastName || "",
-      displayName:
-        user.displayName ||
-        `${extraData.firstName || ""} ${extraData.lastName || ""}`.trim(),
+      displayName: user.displayName || typedFullName || user.email || "",
       email: user.email || "",
       photoURL: user.photoURL || "",
       updatedAt: serverTimestamp(),
@@ -49,14 +51,45 @@ async function saveUserProfile(user, extraData = {}) {
   );
 }
 
+function buildFullName(profile = {}) {
+  return `${profile.firstName || ""} ${profile.lastName || ""}`.trim();
+}
+
+function getProfileDisplayName(profile = {}, fallbackEmail = "") {
+  return (
+    buildFullName(profile) ||
+    profile.displayName ||
+    fallbackEmail ||
+    profile.email ||
+    "Member"
+  );
+}
+
+async function getUserProfile(uid) {
+  if (!uid) return null;
+
+  const snap = await getDoc(doc(db, "users", uid));
+
+  if (!snap.exists()) return null;
+
+  return {
+    uid,
+    ...snap.data(),
+  };
+}
+
+function getMemberName(member = {}) {
+  return getProfileDisplayName(member, member.email);
+}
+
 function generateInviteCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-function getWednesdayWeekStart(date = new Date()) {
+function getMondayWeekStart(date = new Date()) {
   const d = new Date(date);
   const day = d.getDay();
-  const diff = (day - 3 + 7) % 7;
+  const diff = day === 0 ? 6 : day - 1;
   d.setDate(d.getDate() - diff);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -109,10 +142,10 @@ function getNextShow(shows) {
   return shows[shows.length - 1];
 }
 
-function getAvailabilityWeekDays() {
-  const start = getWednesdayWeekStart();
+function getAvailabilityDays() {
+  const start = getMondayWeekStart();
 
-  return Array.from({ length: 7 }, (_, i) => {
+  return Array.from({ length: 14 }, (_, i) => {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
 
@@ -120,6 +153,7 @@ function getAvailabilityWeekDays() {
       date: d,
       key: formatDateKey(d),
       label: formatDayLabel(d),
+      weekNumber: i < 7 ? 1 : 2,
     };
   });
 }
@@ -184,9 +218,7 @@ function getSharedAvailability(bandAvailability, weekDays) {
           };
         }
 
-        slotMap[slotKey].members.push(
-          member.displayName || member.email || "Member"
-        );
+        slotMap[slotKey].members.push(getMemberName(member));
       });
     });
 
@@ -390,6 +422,9 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
   const [showJoinBand, setShowJoinBand] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joiningBand, setJoiningBand] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState(
+    user.displayName || user.email
+  );
 
   const loadBands = async () => {
     try {
@@ -420,6 +455,22 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
     loadBands();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
+
+  useEffect(() => {
+    const loadCurrentUserName = async () => {
+      try {
+        const profile = await getUserProfile(user.uid);
+
+        if (profile) {
+          setCurrentUserName(getProfileDisplayName(profile, user.email));
+        }
+      } catch (err) {
+        console.error("Error loading user profile:", err);
+      }
+    };
+
+    loadCurrentUserName();
+  }, [user.uid, user.email]);
 
   const handleJoinBand = async () => {
     const code = joinCode.trim().toUpperCase();
@@ -457,6 +508,7 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
         doc(db, "users", user.uid, "bands", bandDoc.id),
         {
           bandId: bandDoc.id,
+          instrument: "Unassigned",
           joinedAt: serverTimestamp(),
         },
         { merge: true }
@@ -486,7 +538,7 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
             <h1 style={styles.dashboardTitle}>
               Welcome,
               <br />
-              {user.displayName || user.email}
+              {currentUserName || user.displayName || user.email}
             </h1>
           </div>
 
@@ -631,6 +683,7 @@ function CreateBandPage({ user, goHome }) {
 
       await setDoc(doc(db, "users", user.uid, "bands", bandRef.id), {
         bandId: bandRef.id,
+        instrument: "Unassigned",
         joinedAt: serverTimestamp(),
       });
 
@@ -703,8 +756,10 @@ function BandPage({ user, band, goHome }) {
   const [currentLogoURL, setCurrentLogoURL] = useState(band.logoURL);
   const [saving, setSaving] = useState(false);
 
-  const weekDays = getAvailabilityWeekDays();
-  const weekStart = getWednesdayWeekStart();
+  const availabilityDays = getAvailabilityDays();
+  const currentWeekDays = availabilityDays.slice(0, 7);
+  const nextWeekDays = availabilityDays.slice(7, 14);
+  const weekStart = getMondayWeekStart();
   const weekId = formatDateKey(weekStart);
 
   const [selectedDay, setSelectedDay] = useState(null);
@@ -744,10 +799,84 @@ function BandPage({ user, band, goHome }) {
   });
   const [editingPracticeId, setEditingPracticeId] = useState(null);
 
-  const sharedAvailability = getSharedAvailability(bandAvailability, weekDays);
+  const [memberProfiles, setMemberProfiles] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [currentUserProfile, setCurrentUserProfile] = useState(null);
+
+  const sharedAvailability = getSharedAvailability(bandAvailability, availabilityDays);
   const nextShow = getNextShow(shows);
   const nextGoal = goals[0] || null;
   const nextPractice = practices[0] || null;
+
+  const getCurrentUserName = async () => {
+    const profile = currentUserProfile || (await getUserProfile(user.uid));
+    const resolvedName = getProfileDisplayName(profile || {}, user.email);
+
+    if (!currentUserProfile && profile) {
+      setCurrentUserProfile(profile);
+    }
+
+    return resolvedName;
+  };
+
+  const loadBandMembers = async () => {
+    try {
+      setLoadingMembers(true);
+
+      const memberIds = Array.isArray(band.memberIds) ? band.memberIds : [];
+
+      const loadedMembers = await Promise.all(
+        memberIds.map(async (uid) => {
+          const profile = await getUserProfile(uid);
+          const membershipSnap = await getDoc(
+            doc(db, "users", uid, "bands", band.id)
+          );
+
+          const membership = membershipSnap.exists()
+            ? membershipSnap.data()
+            : {};
+
+          return {
+            uid,
+            firstName: profile?.firstName || "",
+            lastName: profile?.lastName || "",
+            displayName: getProfileDisplayName(profile || {}, profile?.email || ""),
+            email: profile?.email || "",
+            instrument: membership.instrument || "Unassigned",
+          };
+        })
+      );
+
+      setMemberProfiles(loadedMembers);
+    } catch (err) {
+      console.error("Error loading band members:", err);
+      alert(err.message);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
+
+  const updateMemberInstrument = async (uid, instrument) => {
+    try {
+      await setDoc(
+        doc(db, "users", uid, "bands", band.id),
+        {
+          bandId: band.id,
+          instrument,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setMemberProfiles((prev) =>
+        prev.map((member) =>
+          member.uid === uid ? { ...member, instrument } : member
+        )
+      );
+    } catch (err) {
+      alert(err.message);
+    }
+  };
 
   const loadShows = async () => {
     try {
@@ -848,7 +977,7 @@ function BandPage({ user, band, goHome }) {
         await addDoc(collection(db, "bands", band.id, "shows"), {
           ...showData,
           createdBy: user.uid,
-          createdByName: user.displayName || user.email,
+          createdByName: await getCurrentUserName(),
           createdAt: serverTimestamp(),
         });
       }
@@ -959,7 +1088,7 @@ function BandPage({ user, band, goHome }) {
         await addDoc(collection(db, "bands", band.id, "goals"), {
           ...goalData,
           createdBy: user.uid,
-          createdByName: user.displayName || user.email,
+          createdByName: await getCurrentUserName(),
           createdAt: serverTimestamp(),
         });
       }
@@ -1072,7 +1201,7 @@ function BandPage({ user, band, goHome }) {
         await addDoc(collection(db, "bands", band.id, "practices"), {
           ...practiceData,
           createdBy: user.uid,
-          createdByName: user.displayName || user.email,
+          createdByName: await getCurrentUserName(),
           createdAt: serverTimestamp(),
         });
       }
@@ -1116,12 +1245,21 @@ function BandPage({ user, band, goHome }) {
     try {
       setSaving(true);
 
+      const profile = currentUserProfile || (await getUserProfile(user.uid));
+      const displayName = getProfileDisplayName(profile || {}, user.email);
+
+      if (!currentUserProfile && profile) {
+        setCurrentUserProfile(profile);
+      }
+
       await setDoc(
         doc(db, "bands", band.id, "availability", weekId, "members", user.uid),
         {
           uid: user.uid,
-          displayName: user.displayName || user.email,
-          email: user.email || "",
+          firstName: profile?.firstName || "",
+          lastName: profile?.lastName || "",
+          displayName,
+          email: user.email || profile?.email || "",
           bandId: band.id,
           weekId,
           weekStart,
@@ -1147,11 +1285,28 @@ function BandPage({ user, band, goHome }) {
         collection(db, "bands", band.id, "availability", weekId, "members")
       );
 
+      const profileMap = Object.fromEntries(
+        memberProfiles.map((member) => [member.uid, member])
+      );
+
       setBandAvailability(
-        snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }))
+        snap.docs.map((doc) => {
+          const data = doc.data();
+          const profile = profileMap[doc.id] || {};
+
+          return {
+            id: doc.id,
+            ...data,
+            firstName: profile.firstName || data.firstName || "",
+            lastName: profile.lastName || data.lastName || "",
+            displayName: getProfileDisplayName(
+              { ...data, ...profile },
+              data.email || profile.email
+            ),
+            email: data.email || profile.email || "",
+            instrument: profile.instrument || "Unassigned",
+          };
+        })
       );
     } catch (err) {
       alert(err.message);
@@ -1166,6 +1321,17 @@ function BandPage({ user, band, goHome }) {
   }, [band.id, user.uid, weekId]);
 
   useEffect(() => {
+    const loadCurrentProfile = async () => {
+      try {
+        const profile = await getUserProfile(user.uid);
+        setCurrentUserProfile(profile);
+      } catch (err) {
+        console.error("Error loading current user profile:", err);
+      }
+    };
+
+    loadCurrentProfile();
+    loadBandMembers();
     loadShows();
     loadGoals();
     loadPractices();
@@ -1227,7 +1393,7 @@ function BandPage({ user, band, goHome }) {
     },
     {
       title: "My Availability",
-      subtitle: "Set when you can practice this week.",
+      subtitle: "Set when you can practice across the next two weeks.",
       value: Object.keys(availabilityDraft).length ? "Submitted" : "Not submitted",
     },
     {
@@ -1339,6 +1505,8 @@ function BandPage({ user, band, goHome }) {
                 <p style={styles.kicker}>GIG BOARD</p>
                 <h1 style={styles.bandPageTitle}>Upcoming Shows</h1>
               </div>
+
+
 
               <div style={styles.settingsActions}>
                 <button
@@ -1945,10 +2113,10 @@ function BandPage({ user, band, goHome }) {
                 onMouseEnter={addHoverLift}
                 onMouseLeave={removeHoverLift}
               >
-                <p style={styles.sectionValue}>THIS WEEK</p>
+                <p style={styles.sectionValue}>NEXT 2 WEEKS</p>
                 <h2 style={styles.sectionTitle}>Set My Availability</h2>
                 <p style={styles.sectionSubtitle}>
-                  Choose the days and times you can practice this week.
+                  Choose the days and times you can practice across two Monday-to-Sunday weeks.
                 </p>
               </div>
 
@@ -1988,7 +2156,7 @@ function BandPage({ user, band, goHome }) {
           <div style={styles.availabilityPage}>
             <div style={styles.settingsHeader}>
               <div>
-                <p style={styles.kicker}>THIS WEEK</p>
+                <p style={styles.kicker}>NEXT 2 WEEKS</p>
                 <h1 style={styles.bandPageTitle}>Set Availability</h1>
               </div>
 
@@ -2002,64 +2170,130 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.weekGrid}>
-              {weekDays.map((day) => {
-                const saved = availabilityDraft[day.key];
+            <div style={styles.weekSection}>
+              <p style={styles.kicker}>WEEK 1 · MONDAY TO SUNDAY</p>
+              <div style={styles.weekGrid}>
+                {currentWeekDays.map((day) => {
+                  const saved = availabilityDraft[day.key];
 
-                return (
-                  <div
-                    key={day.key}
-                    style={{
-                      ...styles.dayCard,
-                      border:
-                        saved?.available === true
-                          ? "1px solid rgba(0,255,120,0.65)"
-                          : saved?.available === false
-                          ? "1px solid rgba(255,0,0,0.65)"
-                          : "1px solid rgba(255,255,255,0.12)",
-                    }}
-                    onClick={() => {
-                      setSelectedDay(day);
-                      setView("editDayAvailability");
-                    }}
-                    onMouseEnter={addHoverLift}
-                    onMouseLeave={removeHoverLift}
-                  >
-                    <p
+                  return (
+                    <div
+                      key={day.key}
                       style={{
-                        ...styles.sectionValue,
-                        color:
+                        ...styles.dayCard,
+                        border:
                           saved?.available === true
-                            ? "#00ff78"
+                            ? "1px solid rgba(0,255,120,0.65)"
                             : saved?.available === false
-                            ? "#ff2a2a"
-                            : "#ff2a2a",
+                            ? "1px solid rgba(255,0,0,0.65)"
+                            : "1px solid rgba(255,255,255,0.12)",
                       }}
+                      onClick={() => {
+                        setSelectedDay(day);
+                        setView("editDayAvailability");
+                      }}
+                      onMouseEnter={addHoverLift}
+                      onMouseLeave={removeHoverLift}
                     >
-                      {saved?.available === true
-                        ? "AVAILABLE"
-                        : saved?.available === false
-                        ? "NOT AVAILABLE"
-                        : "NOT SET"}
-                    </p>
+                      <p
+                        style={{
+                          ...styles.sectionValue,
+                          color:
+                            saved?.available === true
+                              ? "#00ff78"
+                              : saved?.available === false
+                              ? "#ff2a2a"
+                              : "#ff2a2a",
+                        }}
+                      >
+                        {saved?.available === true
+                          ? "AVAILABLE"
+                          : saved?.available === false
+                          ? "NOT AVAILABLE"
+                          : "NOT SET"}
+                      </p>
 
-                    <h2 style={styles.sectionTitle}>{day.label}</h2>
+                      <h2 style={styles.sectionTitle}>{day.label}</h2>
 
-                    <p style={styles.sectionSubtitle}>
-                      {saved?.slots?.length
-                        ? saved.slots
-                            .map(
-                              (slot) =>
-                                `${formatTimeLabel(slot.start)} - ${formatTimeLabel(
-                                  slot.end
-                                )}`
-                            )
-                            .join(", ")
-                        : "Tap to set availability"}
-                    </p>
-                  </div>
-                );
-              })}
+                      <p style={styles.sectionSubtitle}>
+                        {saved?.slots?.length
+                          ? saved.slots
+                              .map(
+                                (slot) =>
+                                  `${formatTimeLabel(slot.start)} - ${formatTimeLabel(
+                                    slot.end
+                                  )}`
+                              )
+                              .join(", ")
+                          : "Tap to set availability"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={styles.weekSection}>
+              <p style={styles.kicker}>WEEK 2 · MONDAY TO SUNDAY</p>
+              <div style={styles.weekGrid}>
+                {nextWeekDays.map((day) => {
+                  const saved = availabilityDraft[day.key];
+
+                  return (
+                    <div
+                      key={day.key}
+                      style={{
+                        ...styles.dayCard,
+                        border:
+                          saved?.available === true
+                            ? "1px solid rgba(0,255,120,0.65)"
+                            : saved?.available === false
+                            ? "1px solid rgba(255,0,0,0.65)"
+                            : "1px solid rgba(255,255,255,0.12)",
+                      }}
+                      onClick={() => {
+                        setSelectedDay(day);
+                        setView("editDayAvailability");
+                      }}
+                      onMouseEnter={addHoverLift}
+                      onMouseLeave={removeHoverLift}
+                    >
+                      <p
+                        style={{
+                          ...styles.sectionValue,
+                          color:
+                            saved?.available === true
+                              ? "#00ff78"
+                              : saved?.available === false
+                              ? "#ff2a2a"
+                              : "#ff2a2a",
+                        }}
+                      >
+                        {saved?.available === true
+                          ? "AVAILABLE"
+                          : saved?.available === false
+                          ? "NOT AVAILABLE"
+                          : "NOT SET"}
+                      </p>
+
+                      <h2 style={styles.sectionTitle}>{day.label}</h2>
+
+                      <p style={styles.sectionSubtitle}>
+                        {saved?.slots?.length
+                          ? saved.slots
+                              .map(
+                                (slot) =>
+                                  `${formatTimeLabel(slot.start)} - ${formatTimeLabel(
+                                    slot.end
+                                  )}`
+                              )
+                              .join(", ")
+                          : "Tap to set availability"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <button
@@ -2069,7 +2303,7 @@ function BandPage({ user, band, goHome }) {
               onMouseEnter={addButtonHover}
               onMouseLeave={removeButtonHover}
             >
-              {saving ? "SAVING..." : "SAVE WEEK"}
+              {saving ? "SAVING..." : "SAVE 2 WEEKS"}
             </button>
           </div>
         )}
@@ -2305,52 +2539,103 @@ function BandPage({ user, band, goHome }) {
                     bandAvailability.map((member) => (
                       <div key={member.id} style={styles.memberCard}>
                         <h2 style={styles.sectionTitle}>
-                          {member.displayName || member.email}
+                          {getMemberName(member)}
                         </h2>
 
-                        <div style={styles.memberDaysGrid}>
-                          {weekDays.map((day) => {
-                            const dayData = member.days?.[day.key];
+                        <div style={styles.memberWeekSection}>
+                          <p style={styles.kicker}>WEEK 1 · MONDAY TO SUNDAY</p>
+                          <div style={styles.memberDaysGrid}>
+                            {currentWeekDays.map((day) => {
+                              const dayData = member.days?.[day.key];
 
-                            return (
-                              <div key={day.key} style={styles.memberDayCard}>
-                                <p
-                                  style={{
-                                    ...styles.sectionValue,
-                                    color:
-                                      dayData?.available === true
-                                        ? "#00ff78"
-                                        : dayData?.available === false
-                                        ? "#ff2a2a"
-                                        : "#777",
-                                  }}
-                                >
-                                  {dayData?.available === true
-                                    ? "AVAILABLE"
-                                    : dayData?.available === false
-                                    ? "NOT AVAILABLE"
-                                    : "NOT SET"}
-                                </p>
+                              return (
+                                <div key={day.key} style={styles.memberDayCard}>
+                                  <p
+                                    style={{
+                                      ...styles.sectionValue,
+                                      color:
+                                        dayData?.available === true
+                                          ? "#00ff78"
+                                          : dayData?.available === false
+                                          ? "#ff2a2a"
+                                          : "#777",
+                                    }}
+                                  >
+                                    {dayData?.available === true
+                                      ? "AVAILABLE"
+                                      : dayData?.available === false
+                                      ? "NOT AVAILABLE"
+                                      : "NOT SET"}
+                                  </p>
 
-                                <h3 style={styles.memberDayTitle}>
-                                  {day.label}
-                                </h3>
+                                  <h3 style={styles.memberDayTitle}>
+                                    {day.label}
+                                  </h3>
 
-                                <p style={styles.sectionSubtitle}>
-                                  {dayData?.slots?.length
-                                    ? dayData.slots
-                                        .map(
-                                          (slot) =>
-                                            `${formatTimeLabel(
-                                              slot.start
-                                            )} - ${formatTimeLabel(slot.end)}`
-                                        )
-                                        .join(", ")
-                                    : "—"}
-                                </p>
-                              </div>
-                            );
-                          })}
+                                  <p style={styles.sectionSubtitle}>
+                                    {dayData?.slots?.length
+                                      ? dayData.slots
+                                          .map(
+                                            (slot) =>
+                                              `${formatTimeLabel(
+                                                slot.start
+                                              )} - ${formatTimeLabel(slot.end)}`
+                                          )
+                                          .join(", ")
+                                      : "—"}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div style={styles.memberWeekSection}>
+                          <p style={styles.kicker}>WEEK 2 · MONDAY TO SUNDAY</p>
+                          <div style={styles.memberDaysGrid}>
+                            {nextWeekDays.map((day) => {
+                              const dayData = member.days?.[day.key];
+
+                              return (
+                                <div key={day.key} style={styles.memberDayCard}>
+                                  <p
+                                    style={{
+                                      ...styles.sectionValue,
+                                      color:
+                                        dayData?.available === true
+                                          ? "#00ff78"
+                                          : dayData?.available === false
+                                          ? "#ff2a2a"
+                                          : "#777",
+                                    }}
+                                  >
+                                    {dayData?.available === true
+                                      ? "AVAILABLE"
+                                      : dayData?.available === false
+                                      ? "NOT AVAILABLE"
+                                      : "NOT SET"}
+                                  </p>
+
+                                  <h3 style={styles.memberDayTitle}>
+                                    {day.label}
+                                  </h3>
+
+                                  <p style={styles.sectionSubtitle}>
+                                    {dayData?.slots?.length
+                                      ? dayData.slots
+                                          .map(
+                                            (slot) =>
+                                              `${formatTimeLabel(
+                                                slot.start
+                                              )} - ${formatTimeLabel(slot.end)}`
+                                          )
+                                          .join(", ")
+                                      : "—"}
+                                  </p>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -2410,6 +2695,44 @@ function BandPage({ user, band, goHome }) {
                 <p style={styles.inviteHint}>
                   Share this code with band members so they can join later.
                 </p>
+              </div>
+
+              <div style={styles.memberSettingsBox}>
+                <p style={styles.kicker}>BAND MEMBERS</p>
+
+                {loadingMembers ? (
+                  <p style={styles.sectionSubtitle}>Loading members...</p>
+                ) : memberProfiles.length === 0 ? (
+                  <p style={styles.sectionSubtitle}>No members loaded yet.</p>
+                ) : (
+                  <div style={styles.memberSettingsList}>
+                    {memberProfiles.map((member) => (
+                      <div key={member.uid} style={styles.memberSettingsRow}>
+                        <div>
+                          <h3 style={styles.memberName}>
+                            {buildFullName(member) || member.displayName || "Band Member"}
+                          </h3>
+                        </div>
+
+                        <select
+                          style={styles.select}
+                          value={member.instrument || "Unassigned"}
+                          onChange={(e) =>
+                            updateMemberInstrument(member.uid, e.target.value)
+                          }
+                          onMouseEnter={addInputHover}
+                          onMouseLeave={removeInputHover}
+                        >
+                          <option value="Unassigned">Unassigned</option>
+                          <option value="Guitar">Guitar</option>
+                          <option value="Drums">Drums</option>
+                          <option value="Vocals">Vocals</option>
+                          <option value="Bass">Bass</option>
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div style={styles.settingsActions}>
@@ -3003,6 +3326,14 @@ const styles = {
     transform: "translateY(0px) scale(1)",
   },
 
+  weekSection: {
+    marginTop: 34,
+  },
+
+  memberWeekSection: {
+    marginTop: 22,
+  },
+
   weekGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(7, 1fr)",
@@ -3084,6 +3415,60 @@ const styles = {
     border: "1px solid rgba(255,255,255,0.1)",
     borderRadius: 16,
     padding: 14,
+  },
+
+  memberSettingsBox: {
+    background: "rgba(255,255,255,0.05)",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 18,
+    padding: 20,
+  },
+
+  memberSettingsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    marginTop: 12,
+  },
+
+  memberSettingsRow: {
+    display: "grid",
+    gridTemplateColumns: "1fr 180px",
+    gap: 14,
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 16,
+    background: "rgba(0,0,0,0.24)",
+    border: "1px solid rgba(255,255,255,0.08)",
+  },
+
+  memberName: {
+    margin: 0,
+    fontSize: 18,
+    textTransform: "uppercase",
+    letterSpacing: "-0.5px",
+  },
+
+  memberEmail: {
+    margin: "6px 0 0",
+    opacity: 0.58,
+    fontWeight: 700,
+    wordBreak: "break-word",
+  },
+
+  select: {
+    padding: "14px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.16)",
+    background: "rgba(255,255,255,0.08)",
+    color: "white",
+    fontSize: 15,
+    outline: "none",
+    width: "100%",
+    boxSizing: "border-box",
+    transition: "0.25s ease",
+    cursor: "pointer",
+    boxShadow: "0 0 0 rgba(255,0,0,0)",
   },
 
   memberDayTitle: {
