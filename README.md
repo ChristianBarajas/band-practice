@@ -1,4 +1,12 @@
-# 🎸 Band Practice
+<p align="center">
+  <img src="./public/favicon.png" alt="Band Practice Logo" width="180" />
+</p>
+
+<h1 align="center">Band Practice</h1>
+
+<p align="center">
+  A full-stack band management platform for organizing availability, practices, shows, goals, and members.
+</p>
 
 **Band Practice** is a full-stack web application designed to help bands organize rehearsals, availability, shows, goals, and members from one shared dashboard.
 
