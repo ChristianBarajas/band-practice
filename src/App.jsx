@@ -232,6 +232,274 @@ function getSharedAvailability(bandAvailability, weekDays) {
   return results;
 }
 
+
+const responsiveCss = `
+  html, body, #root {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  img, video {
+    max-width: 100%;
+  }
+
+  @media (max-width: 900px) {
+    .bp-authContent {
+      grid-template-columns: 1fr !important;
+      min-height: auto !important;
+      padding: 32px 24px 48px !important;
+      gap: 28px !important;
+    }
+
+    .bp-heroText {
+      max-width: 100% !important;
+    }
+
+    .bp-heroTitle {
+      font-size: clamp(52px, 15vw, 86px) !important;
+      letter-spacing: -3px !important;
+    }
+
+    .bp-heroSubtitle {
+      font-size: 20px !important;
+      margin-top: 20px !important;
+    }
+
+    .bp-authCard {
+      width: 100% !important;
+      max-width: 560px !important;
+      margin: 0 auto !important;
+    }
+
+    .bp-pageContent {
+      padding: 28px 22px 48px !important;
+    }
+
+    .bp-header,
+    .bp-bandDashboardHero,
+    .bp-settingsHeader {
+      gap: 18px !important;
+    }
+
+    .bp-bandDashboardGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-logoPanel {
+      min-height: 260px !important;
+    }
+
+    .bp-bandPageLogo {
+      height: 300px !important;
+    }
+
+    .bp-dashboardSectionGrid {
+      grid-template-columns: 1fr 1fr !important;
+    }
+
+    .bp-availabilityMenuGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-showsGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-weekGrid,
+    .bp-memberDaysGrid {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    }
+
+    .bp-sharedGrid {
+      grid-template-columns: 1fr 1fr !important;
+    }
+
+    .bp-bandPageTitle {
+      font-size: clamp(44px, 10vw, 76px) !important;
+      overflow-wrap: anywhere;
+    }
+  }
+
+  @media (max-width: 650px) {
+    .bp-pageContent {
+      padding: 20px 14px 38px !important;
+    }
+
+    .bp-authContent {
+      padding: 24px 16px 40px !important;
+    }
+
+    .bp-authCard,
+    .bp-createCard,
+    .bp-settingsPanel,
+    .bp-showCard,
+    .bp-sharedPanel,
+    .bp-memberCard,
+    .bp-memberSettingsBox {
+      padding: 20px !important;
+      border-radius: 18px !important;
+    }
+
+    .bp-createCard {
+      margin: 34px auto !important;
+    }
+
+    .bp-header,
+    .bp-bandDashboardHero,
+    .bp-settingsHeader {
+      flex-direction: column !important;
+      align-items: stretch !important;
+    }
+
+    .bp-settingsButton {
+      align-self: flex-start !important;
+    }
+
+    .bp-homeActions,
+    .bp-settingsActions,
+    .bp-showActions {
+      width: 100% !important;
+      flex-direction: column !important;
+      gap: 10px !important;
+    }
+
+    .bp-homeActions > button,
+    .bp-settingsActions > button,
+    .bp-showActions > button {
+      width: 100% !important;
+    }
+
+    .bp-joinBandRow {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-dashboardSectionGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-dashboardSectionCard,
+    .bp-availabilityMenuCard {
+      min-height: 0 !important;
+    }
+
+    .bp-weekGrid,
+    .bp-memberDaysGrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 10px !important;
+      margin-top: 20px !important;
+    }
+
+    .bp-dayCard,
+    .bp-memberDayCard {
+      min-width: 0 !important;
+      padding: 14px !important;
+    }
+
+    .bp-sharedGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-timeSlotRow,
+    .bp-memberSettingsRow {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-row {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      overflow-x: visible !important;
+      width: 100% !important;
+    }
+
+    .bp-bandCard {
+      min-width: 0 !important;
+      width: 100% !important;
+      height: 300px !important;
+    }
+
+    .bp-backButton {
+      width: 100% !important;
+      font-size: 16px !important;
+      text-align: center !important;
+    }
+
+    .bp-bandPageTitle {
+      font-size: clamp(38px, 13vw, 60px) !important;
+      line-height: .95 !important;
+      letter-spacing: -2px !important;
+    }
+
+    .bp-dashboardTitle {
+      font-size: clamp(30px, 10vw, 46px) !important;
+      line-height: .95 !important;
+      letter-spacing: -2px !important;
+      overflow-wrap: anywhere;
+    }
+
+    .bp-formTitle {
+      font-size: clamp(34px, 11vw, 48px) !important;
+      letter-spacing: -1px !important;
+    }
+
+    .bp-sectionTitle {
+      font-size: 24px !important;
+    }
+
+    .bp-input,
+    .bp-textarea,
+    .bp-select {
+      font-size: 16px !important;
+    }
+
+    .bp-primaryButton,
+    .bp-secondaryButton,
+    .bp-dangerButton,
+    .bp-googleButton,
+    .bp-linkButton {
+      min-height: 48px !important;
+    }
+
+    .bp-bandPageLogo {
+      height: 230px !important;
+      padding: 16px !important;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .bp-weekGrid,
+    .bp-memberDaysGrid {
+      grid-template-columns: 1fr !important;
+    }
+
+    .bp-heroTitle {
+      font-size: 48px !important;
+    }
+  }
+
+  @media (hover: none) {
+    .bp-bandCard,
+    .bp-dashboardSectionCard,
+    .bp-availabilityMenuCard,
+    .bp-dayCard,
+    .bp-primaryButton,
+    .bp-secondaryButton,
+    .bp-dangerButton {
+      transform: none !important;
+    }
+  }
+`;
+
+
+function ResponsiveStyles() {
+  return <style>{responsiveCss}</style>;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [page, setPage] = useState("home");
@@ -324,13 +592,14 @@ function AuthPage() {
 
   return (
     <div style={styles.authPage}>
+      <ResponsiveStyles />
       <div style={styles.darkOverlay}></div>
 
-      <div style={styles.authContent}>
-        <section style={styles.heroText}>
+      <div className="bp-authContent" style={styles.authContent}>
+        <section className="bp-heroText" style={styles.heroText}>
           <p style={styles.kicker}>NO MORE CHAOS. NO MORE GROUP CHAT HELL.</p>
 
-          <h1 style={styles.heroTitle}>
+          <h1 className="bp-heroTitle" style={styles.heroTitle}>
             WELCOME
             <br />
             TO BAND
@@ -338,28 +607,28 @@ function AuthPage() {
             PRACTICE
           </h1>
 
-          <p style={styles.heroSubtitle}>
+          <p className="bp-heroSubtitle" style={styles.heroSubtitle}>
             Create your band, see who’s free, lock in practice, and keep the
             whole crew on the same page.
           </p>
         </section>
 
-        <section style={styles.authCard}>
-          <h2 style={styles.formTitle}>
+        <section className="bp-authCard" style={styles.authCard}>
+          <h2 className="bp-formTitle" style={styles.formTitle}>
             {isLogin ? "SIGN IN" : "CREATE ACCOUNT"}
           </h2>
 
           {!isLogin && (
             <>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="First Name"
                 value={first}
                 onChange={(e) => setFirst(e.target.value)}
               />
 
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Last Name"
                 value={last}
                 onChange={(e) => setLast(e.target.value)}
@@ -368,25 +637,25 @@ function AuthPage() {
           )}
 
           <input
-            style={styles.input}
+            className="bp-input" style={styles.input}
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
 
           <input
-            style={styles.input}
+            className="bp-input" style={styles.input}
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          <button style={styles.primaryButton} onClick={handleEmailAuth}>
+          <button className="bp-primaryButton" style={styles.primaryButton} onClick={handleEmailAuth}>
             {isLogin ? "LOGIN" : "SIGN UP"}
           </button>
 
-          <button style={styles.googleButton} onClick={handleGoogle}>
+          <button className="bp-googleButton" style={styles.googleButton} onClick={handleGoogle}>
             Continue with Google
           </button>
 
@@ -404,11 +673,12 @@ function AuthPage() {
 function VerifyPage({ user }) {
   return (
     <div style={styles.center}>
-      <div style={styles.authCard}>
-        <h2 style={styles.formTitle}>VERIFY EMAIL</h2>
+      <ResponsiveStyles />
+      <div className="bp-authCard" style={styles.authCard}>
+        <h2 className="bp-formTitle" style={styles.formTitle}>VERIFY EMAIL</h2>
         <p>{user.email}</p>
 
-        <button style={styles.primaryButton} onClick={() => signOut(auth)}>
+        <button className="bp-primaryButton" style={styles.primaryButton} onClick={() => signOut(auth)}>
           LOGOUT
         </button>
       </div>
@@ -528,14 +798,15 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
 
   return (
     <div style={styles.page}>
+      <ResponsiveStyles />
       <div style={styles.darkOverlay}></div>
 
-      <div style={styles.pageContent}>
-        <div style={styles.header}>
+      <div className="bp-pageContent" style={styles.pageContent}>
+        <div className="bp-header" style={styles.header}>
           <div>
             <p style={styles.kicker}>YOUR CREW</p>
 
-            <h1 style={styles.dashboardTitle}>
+            <h1 className="bp-dashboardTitle" style={styles.dashboardTitle}>
               Welcome,
               <br />
               {currentUserName || user.displayName || user.email}
@@ -543,7 +814,7 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
           </div>
 
           <button
-            style={styles.secondaryButton}
+            className="bp-secondaryButton" style={styles.secondaryButton}
             onClick={() => signOut(auth)}
             onMouseEnter={addButtonHover}
             onMouseLeave={removeButtonHover}
@@ -552,9 +823,9 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
           </button>
         </div>
 
-        <div style={styles.homeActions}>
+        <div className="bp-homeActions" style={styles.homeActions}>
           <button
-            style={styles.primaryButton}
+            className="bp-primaryButton" style={styles.primaryButton}
             onClick={goCreateBand}
             onMouseEnter={addButtonHover}
             onMouseLeave={removeButtonHover}
@@ -563,7 +834,7 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
           </button>
 
           <button
-            style={styles.secondaryButton}
+            className="bp-secondaryButton" style={styles.secondaryButton}
             onClick={() => setShowJoinBand((prev) => !prev)}
             onMouseEnter={addButtonHover}
             onMouseLeave={removeButtonHover}
@@ -573,18 +844,18 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
         </div>
 
         {showJoinBand && (
-          <div style={styles.joinBandPanel}>
+          <div className="bp-joinBandPanel" style={styles.joinBandPanel}>
             <div>
               <p style={styles.kicker}>INVITE CODE</p>
-              <h2 style={styles.sectionTitle}>Join a Band</h2>
+              <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Join a Band</h2>
               <p style={styles.sectionSubtitle}>
                 Enter the invite code your bandmate shared. Codes are not case-sensitive.
               </p>
             </div>
 
-            <div style={styles.joinBandRow}>
+            <div className="bp-joinBandRow" style={styles.joinBandRow}>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Example: ABC123"
                 value={joinCode}
                 onMouseEnter={addInputHover}
@@ -596,7 +867,7 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
               />
 
               <button
-                style={styles.primaryButton}
+                className="bp-primaryButton" style={styles.primaryButton}
                 onClick={handleJoinBand}
                 disabled={joiningBand}
                 onMouseEnter={addButtonHover}
@@ -606,7 +877,7 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
               </button>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => {
                   setJoinCode("");
                   setShowJoinBand(false);
@@ -626,11 +897,11 @@ function HomePage({ user, refreshKey, goCreateBand, openBand }) {
         ) : bands.length === 0 ? (
           <div style={styles.roadie}>Currently a roadie 🛠️</div>
         ) : (
-          <div style={styles.row}>
+          <div className="bp-row" style={styles.row}>
             {bands.map((band) => (
               <div
                 key={band.id}
-                style={styles.bandCard}
+                className="bp-bandCard" style={styles.bandCard}
                 onClick={() => openBand(band)}
                 onMouseEnter={addHoverLift}
                 onMouseLeave={removeHoverLift}
@@ -698,11 +969,12 @@ function CreateBandPage({ user, goHome }) {
 
   return (
     <div style={styles.page}>
+      <ResponsiveStyles />
       <div style={styles.darkOverlay}></div>
 
-      <div style={styles.pageContent}>
+      <div className="bp-pageContent" style={styles.pageContent}>
         <button
-          style={styles.backButton}
+          className="bp-backButton" style={styles.backButton}
           onClick={goHome}
           onMouseEnter={addButtonHover}
           onMouseLeave={removeButtonHover}
@@ -710,15 +982,15 @@ function CreateBandPage({ user, goHome }) {
           ← BACK
         </button>
 
-        <div style={styles.createCard}>
+        <div className="bp-createCard" style={styles.createCard}>
           <p style={styles.kicker}>START THE MOVEMENT</p>
 
-          <h1 style={styles.formTitle}>CREATE BAND</h1>
+          <h1 className="bp-formTitle" style={styles.formTitle}>CREATE BAND</h1>
 
           <p style={styles.createSubtitle}>Start your crew. Add a name and logo.</p>
 
           <input
-            style={styles.input}
+            className="bp-input" style={styles.input}
             placeholder="Band name"
             value={bandName}
             onChange={(e) => setBandName(e.target.value)}
@@ -727,14 +999,14 @@ function CreateBandPage({ user, goHome }) {
           <label style={styles.fileLabel}>Add Band Logo / Picture</label>
 
           <input
-            style={styles.input}
+            className="bp-input" style={styles.input}
             type="file"
             accept="image/*"
             onChange={(e) => setLogoFile(e.target.files[0])}
           />
 
           <button
-            style={styles.primaryButton}
+            className="bp-primaryButton" style={styles.primaryButton}
             onClick={handleCreateBand}
             disabled={saving}
             onMouseEnter={addButtonHover}
@@ -1414,11 +1686,12 @@ function BandPage({ user, band, goHome }) {
 
   return (
     <div style={styles.page}>
+      <ResponsiveStyles />
       <div style={styles.darkOverlay}></div>
 
-      <div style={styles.pageContent}>
+      <div className="bp-pageContent" style={styles.pageContent}>
         <button
-          style={styles.backButton}
+          className="bp-backButton" style={styles.backButton}
           onClick={goHome}
           onMouseEnter={addButtonHover}
           onMouseLeave={removeButtonHover}
@@ -1428,14 +1701,14 @@ function BandPage({ user, band, goHome }) {
 
         {view === "dashboard" && (
           <>
-            <div style={styles.bandDashboardHero}>
+            <div className="bp-bandDashboardHero" style={styles.bandDashboardHero}>
               <div>
                 <p style={styles.kicker}>BAND DASHBOARD</p>
-                <h1 style={styles.bandPageTitle}>{bandName}</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>{bandName}</h1>
               </div>
 
               <button
-                style={styles.settingsButton}
+                className="bp-settingsButton" style={styles.settingsButton}
                 onClick={() => setView("settings")}
                 title="Band settings"
                 onMouseEnter={addButtonHover}
@@ -1445,19 +1718,20 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.bandDashboardGrid}>
-              <div style={styles.logoPanel}>
+            <div className="bp-bandDashboardGrid" style={styles.bandDashboardGrid}>
+              <div className="bp-logoPanel" style={styles.logoPanel}>
                 <img
                   src={currentLogoURL}
                   alt={bandName}
-                  style={styles.bandPageLogo}
+                  className="bp-bandPageLogo" style={styles.bandPageLogo}
                 />
               </div>
 
-              <div style={styles.dashboardSectionGrid}>
+              <div className="bp-dashboardSectionGrid" style={styles.dashboardSectionGrid}>
                 {dashboardSections.map((section) => (
                   <div
                     key={section.title}
+                    className="bp-dashboardSectionCard"
                     style={{
                       ...styles.dashboardSectionCard,
                       cursor:
@@ -1489,7 +1763,7 @@ function BandPage({ user, band, goHome }) {
                     onMouseLeave={removeHoverLift}
                   >
                     <p style={styles.sectionValue}>{section.value}</p>
-                    <h2 style={styles.sectionTitle}>{section.title}</h2>
+                    <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{section.title}</h2>
                     <p style={styles.sectionSubtitle}>{section.subtitle}</p>
                   </div>
                 ))}
@@ -1499,18 +1773,18 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "showsHome" && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>GIG BOARD</p>
-                <h1 style={styles.bandPageTitle}>Upcoming Shows</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Upcoming Shows</h1>
               </div>
 
 
 
-              <div style={styles.settingsActions}>
+              <div className="bp-settingsActions" style={styles.settingsActions}>
                 <button
-                  style={styles.primaryButton}
+                  className="bp-primaryButton" style={styles.primaryButton}
                   onClick={() => {
                     resetShowForm();
                     setView("addShow");
@@ -1522,7 +1796,7 @@ function BandPage({ user, band, goHome }) {
                 </button>
 
                 <button
-                  style={styles.secondaryButton}
+                  className="bp-secondaryButton" style={styles.secondaryButton}
                   onClick={() => setView("dashboard")}
                   onMouseEnter={addButtonHover}
                   onMouseLeave={removeButtonHover}
@@ -1535,20 +1809,20 @@ function BandPage({ user, band, goHome }) {
             {loadingShows ? (
               <div style={styles.roadie}>Loading shows...</div>
             ) : shows.length === 0 ? (
-              <div style={styles.sharedPanel}>
+              <div className="bp-sharedPanel" style={styles.sharedPanel}>
                 <p style={styles.kicker}>NO SHOWS YET</p>
-                <h2 style={styles.sectionTitle}>Start the gig list</h2>
+                <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Start the gig list</h2>
                 <p style={styles.sectionSubtitle}>
                   Add the next show date, location, call time, setlist, and
                   Instagram link.
                 </p>
               </div>
             ) : (
-              <div style={styles.showsGrid}>
+              <div className="bp-showsGrid" style={styles.showsGrid}>
                 {shows.map((show) => (
-                  <div key={show.id} style={styles.showCard}>
+                  <div key={show.id} className="bp-showCard" style={styles.showCard}>
                     <p style={styles.sectionValue}>{formatShowDate(show.date)}</p>
-                    <h2 style={styles.sectionTitle}>{show.title}</h2>
+                    <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{show.title}</h2>
 
                     <p style={styles.sectionSubtitle}>
                       <strong>Location:</strong> {show.location}
@@ -1572,7 +1846,7 @@ function BandPage({ user, band, goHome }) {
 
                     {show.instagramLink && (
                       <a
-                        style={styles.linkButton}
+                        className="bp-linkButton" style={styles.linkButton}
                         href={show.instagramLink}
                         target="_blank"
                         rel="noreferrer"
@@ -1581,9 +1855,9 @@ function BandPage({ user, band, goHome }) {
                       </a>
                     )}
 
-                    <div style={styles.showActions}>
+                    <div className="bp-showActions" style={styles.showActions}>
                       <button
-                        style={styles.secondaryButton}
+                        className="bp-secondaryButton" style={styles.secondaryButton}
                         onClick={() => startEditShow(show)}
                         disabled={saving}
                         onMouseEnter={addButtonHover}
@@ -1593,7 +1867,7 @@ function BandPage({ user, band, goHome }) {
                       </button>
 
                       <button
-                        style={styles.dangerButton}
+                        className="bp-dangerButton" style={styles.dangerButton}
                         onClick={() => deleteShow(show)}
                         disabled={saving}
                         onMouseEnter={addButtonHover}
@@ -1610,17 +1884,17 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "addShow" && (
-          <div style={styles.settingsPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-settingsPage" style={styles.settingsPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>{editingShowId ? "EDIT SHOW" : "NEW SHOW"}</p>
-                <h1 style={styles.bandPageTitle}>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>
                   {editingShowId ? "Edit Show" : "Add Show"}
                 </h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => {
                   resetShowForm();
                   setView("showsHome");
@@ -1632,9 +1906,9 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.settingsPanel}>
+            <div className="bp-settingsPanel" style={styles.settingsPanel}>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Show name / event title"
                 value={showForm.title}
                 onMouseEnter={addInputHover}
@@ -1646,7 +1920,7 @@ function BandPage({ user, band, goHome }) {
 
               <label style={styles.fileLabel}>Show Date</label>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 type="date"
                 value={showForm.date}
                 onMouseEnter={addInputHover}
@@ -1657,7 +1931,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Location / venue"
                 value={showForm.location}
                 onMouseEnter={addInputHover}
@@ -1669,7 +1943,7 @@ function BandPage({ user, band, goHome }) {
 
               <label style={styles.fileLabel}>Call Time</label>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 type="time"
                 value={showForm.callTime}
                 onMouseEnter={addInputHover}
@@ -1680,7 +1954,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <textarea
-                style={styles.textarea}
+                className="bp-textarea" style={styles.textarea}
                 placeholder={"Songs you're gonna play. Put one song per line."}
                 value={showForm.songs}
                 onMouseEnter={addInputHover}
@@ -1691,7 +1965,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Instagram show link"
                 value={showForm.instagramLink}
                 onMouseEnter={addInputHover}
@@ -1705,7 +1979,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <button
-                style={styles.primaryButton}
+                className="bp-primaryButton" style={styles.primaryButton}
                 onClick={saveShow}
                 disabled={saving}
                 onMouseEnter={addButtonHover}
@@ -1718,16 +1992,16 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "goalsHome" && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>BAND MISSION</p>
-                <h1 style={styles.bandPageTitle}>Band Goals</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Band Goals</h1>
               </div>
 
-              <div style={styles.settingsActions}>
+              <div className="bp-settingsActions" style={styles.settingsActions}>
                 <button
-                  style={styles.primaryButton}
+                  className="bp-primaryButton" style={styles.primaryButton}
                   onClick={() => {
                     resetGoalForm();
                     setView("addGoal");
@@ -1739,7 +2013,7 @@ function BandPage({ user, band, goHome }) {
                 </button>
 
                 <button
-                  style={styles.secondaryButton}
+                  className="bp-secondaryButton" style={styles.secondaryButton}
                   onClick={() => setView("dashboard")}
                   onMouseEnter={addButtonHover}
                   onMouseLeave={removeButtonHover}
@@ -1752,23 +2026,23 @@ function BandPage({ user, band, goHome }) {
             {loadingGoals ? (
               <div style={styles.roadie}>Loading goals...</div>
             ) : goals.length === 0 ? (
-              <div style={styles.sharedPanel}>
+              <div className="bp-sharedPanel" style={styles.sharedPanel}>
                 <p style={styles.kicker}>NO GOALS YET</p>
-                <h2 style={styles.sectionTitle}>Add the first mission</h2>
+                <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Add the first mission</h2>
                 <p style={styles.sectionSubtitle}>
                   Create goals for releases, shows, recording, practice focus, or anything
                   the band needs to lock in.
                 </p>
               </div>
             ) : (
-              <div style={styles.showsGrid}>
+              <div className="bp-showsGrid" style={styles.showsGrid}>
                 {goals.map((goal) => (
-                  <div key={goal.id} style={styles.showCard}>
+                  <div key={goal.id} className="bp-showCard" style={styles.showCard}>
                     <p style={styles.sectionValue}>
                       Deadline {formatShowDate(goal.deadline)}
                     </p>
 
-                    <h2 style={styles.sectionTitle}>{goal.title}</h2>
+                    <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{goal.title}</h2>
 
                     {goal.description && (
                       <p style={styles.sectionSubtitle}>
@@ -1790,9 +2064,9 @@ function BandPage({ user, band, goHome }) {
                       </div>
                     )}
 
-                    <div style={styles.showActions}>
+                    <div className="bp-showActions" style={styles.showActions}>
                       <button
-                        style={styles.secondaryButton}
+                        className="bp-secondaryButton" style={styles.secondaryButton}
                         onClick={() => startEditGoal(goal)}
                         disabled={saving}
                         onMouseEnter={addButtonHover}
@@ -1802,7 +2076,7 @@ function BandPage({ user, band, goHome }) {
                       </button>
 
                       <button
-                        style={styles.dangerButton}
+                        className="bp-dangerButton" style={styles.dangerButton}
                         onClick={() => deleteGoal(goal)}
                         disabled={saving}
                         onMouseEnter={addButtonHover}
@@ -1819,17 +2093,17 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "addGoal" && (
-          <div style={styles.settingsPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-settingsPage" style={styles.settingsPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>{editingGoalId ? "EDIT GOAL" : "NEW GOAL"}</p>
-                <h1 style={styles.bandPageTitle}>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>
                   {editingGoalId ? "Edit Goal" : "Add Goal"}
                 </h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => {
                   resetGoalForm();
                   setView("goalsHome");
@@ -1841,9 +2115,9 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.settingsPanel}>
+            <div className="bp-settingsPanel" style={styles.settingsPanel}>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Goal title"
                 value={goalForm.title}
                 onMouseEnter={addInputHover}
@@ -1854,7 +2128,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <textarea
-                style={styles.textarea}
+                className="bp-textarea" style={styles.textarea}
                 placeholder="Description — what is the goal?"
                 value={goalForm.description}
                 onMouseEnter={addInputHover}
@@ -1865,7 +2139,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <textarea
-                style={styles.textarea}
+                className="bp-textarea" style={styles.textarea}
                 placeholder="Why does this matter?"
                 value={goalForm.why}
                 onMouseEnter={addInputHover}
@@ -1876,7 +2150,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <textarea
-                style={styles.textarea}
+                className="bp-textarea" style={styles.textarea}
                 placeholder="How are we going to make it happen?"
                 value={goalForm.how}
                 onMouseEnter={addInputHover}
@@ -1888,7 +2162,7 @@ function BandPage({ user, band, goHome }) {
 
               <label style={styles.fileLabel}>Deadline</label>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 type="date"
                 value={goalForm.deadline}
                 onMouseEnter={addInputHover}
@@ -1899,7 +2173,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <button
-                style={styles.primaryButton}
+                className="bp-primaryButton" style={styles.primaryButton}
                 onClick={saveGoal}
                 disabled={saving}
                 onMouseEnter={addButtonHover}
@@ -1912,16 +2186,16 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "practicesHome" && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>LOCK IT IN</p>
-                <h1 style={styles.bandPageTitle}>Upcoming Practices</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Upcoming Practices</h1>
               </div>
 
-              <div style={styles.settingsActions}>
+              <div className="bp-settingsActions" style={styles.settingsActions}>
                 <button
-                  style={styles.primaryButton}
+                  className="bp-primaryButton" style={styles.primaryButton}
                   onClick={() => {
                     resetPracticeForm();
                     setView("addPractice");
@@ -1933,7 +2207,7 @@ function BandPage({ user, band, goHome }) {
                 </button>
 
                 <button
-                  style={styles.secondaryButton}
+                  className="bp-secondaryButton" style={styles.secondaryButton}
                   onClick={() => setView("dashboard")}
                   onMouseEnter={addButtonHover}
                   onMouseLeave={removeButtonHover}
@@ -1946,20 +2220,20 @@ function BandPage({ user, band, goHome }) {
             {loadingPractices ? (
               <div style={styles.roadie}>Loading practices...</div>
             ) : practices.length === 0 ? (
-              <div style={styles.sharedPanel}>
+              <div className="bp-sharedPanel" style={styles.sharedPanel}>
                 <p style={styles.kicker}>NO PRACTICES YET</p>
-                <h2 style={styles.sectionTitle}>Add a hard practice</h2>
+                <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Add a hard practice</h2>
                 <p style={styles.sectionSubtitle}>
                   Lock in the date, title, location, and focus goal so nobody has to
                   dig through the group chat.
                 </p>
               </div>
             ) : (
-              <div style={styles.showsGrid}>
+              <div className="bp-showsGrid" style={styles.showsGrid}>
                 {practices.map((practice) => (
-                  <div key={practice.id} style={styles.showCard}>
+                  <div key={practice.id} className="bp-showCard" style={styles.showCard}>
                     <p style={styles.sectionValue}>{formatShowDate(practice.date)}</p>
-                    <h2 style={styles.sectionTitle}>{practice.title}</h2>
+                    <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{practice.title}</h2>
 
                     <p style={styles.sectionSubtitle}>
                       <strong>Location:</strong> {practice.location}
@@ -1972,9 +2246,9 @@ function BandPage({ user, band, goHome }) {
                       </div>
                     )}
 
-                    <div style={styles.showActions}>
+                    <div className="bp-showActions" style={styles.showActions}>
                       <button
-                        style={styles.secondaryButton}
+                        className="bp-secondaryButton" style={styles.secondaryButton}
                         onClick={() => startEditPractice(practice)}
                         disabled={saving}
                         onMouseEnter={addButtonHover}
@@ -1984,7 +2258,7 @@ function BandPage({ user, band, goHome }) {
                       </button>
 
                       <button
-                        style={styles.dangerButton}
+                        className="bp-dangerButton" style={styles.dangerButton}
                         onClick={() => deletePractice(practice)}
                         disabled={saving}
                         onMouseEnter={addButtonHover}
@@ -2001,19 +2275,19 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "addPractice" && (
-          <div style={styles.settingsPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-settingsPage" style={styles.settingsPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>
                   {editingPracticeId ? "EDIT PRACTICE" : "NEW PRACTICE"}
                 </p>
-                <h1 style={styles.bandPageTitle}>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>
                   {editingPracticeId ? "Edit Practice" : "Add Practice"}
                 </h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => {
                   resetPracticeForm();
                   setView("practicesHome");
@@ -2025,9 +2299,9 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.settingsPanel}>
+            <div className="bp-settingsPanel" style={styles.settingsPanel}>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Practice title"
                 value={practiceForm.title}
                 onMouseEnter={addInputHover}
@@ -2039,7 +2313,7 @@ function BandPage({ user, band, goHome }) {
 
               <label style={styles.fileLabel}>Practice Date</label>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 type="date"
                 value={practiceForm.date}
                 onMouseEnter={addInputHover}
@@ -2050,7 +2324,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Location"
                 value={practiceForm.location}
                 onMouseEnter={addInputHover}
@@ -2061,7 +2335,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <textarea
-                style={styles.textarea}
+                className="bp-textarea" style={styles.textarea}
                 placeholder="Goal for this practice"
                 value={practiceForm.goal}
                 onMouseEnter={addInputHover}
@@ -2072,7 +2346,7 @@ function BandPage({ user, band, goHome }) {
               />
 
               <button
-                style={styles.primaryButton}
+                className="bp-primaryButton" style={styles.primaryButton}
                 onClick={savePractice}
                 disabled={saving}
                 onMouseEnter={addButtonHover}
@@ -2089,15 +2363,15 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "availabilityHome" && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>BAND AVAILABILITY</p>
-                <h1 style={styles.bandPageTitle}>Availability</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Availability</h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => setView("dashboard")}
                 onMouseEnter={addButtonHover}
                 onMouseLeave={removeButtonHover}
@@ -2106,22 +2380,22 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.availabilityMenuGrid}>
+            <div className="bp-availabilityMenuGrid" style={styles.availabilityMenuGrid}>
               <div
-                style={styles.availabilityMenuCard}
+                className="bp-availabilityMenuCard" style={styles.availabilityMenuCard}
                 onClick={() => setView("setAvailability")}
                 onMouseEnter={addHoverLift}
                 onMouseLeave={removeHoverLift}
               >
                 <p style={styles.sectionValue}>NEXT 2 WEEKS</p>
-                <h2 style={styles.sectionTitle}>Set My Availability</h2>
+                <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Set My Availability</h2>
                 <p style={styles.sectionSubtitle}>
                   Choose the days and times you can practice across two Monday-to-Sunday weeks.
                 </p>
               </div>
 
               <div
-                style={styles.availabilityMenuCard}
+                className="bp-availabilityMenuCard" style={styles.availabilityMenuCard}
                 onClick={async () => {
                   await loadBandAvailability();
                   setView("viewBandAvailability");
@@ -2130,20 +2404,20 @@ function BandPage({ user, band, goHome }) {
                 onMouseLeave={removeHoverLift}
               >
                 <p style={styles.sectionValue}>BAND VIEW</p>
-                <h2 style={styles.sectionTitle}>View Band Availability</h2>
+                <h2 className="bp-sectionTitle" style={styles.sectionTitle}>View Band Availability</h2>
                 <p style={styles.sectionSubtitle}>
                   See when everyone else is free and find 3+ member overlaps.
                 </p>
               </div>
 
               <div
-                style={styles.availabilityMenuCard}
+                className="bp-availabilityMenuCard" style={styles.availabilityMenuCard}
                 onClick={() => setView("practicesHome")}
                 onMouseEnter={addHoverLift}
                 onMouseLeave={removeHoverLift}
               >
                 <p style={styles.sectionValue}>BAND TOOL</p>
-                <h2 style={styles.sectionTitle}>Schedule Practice</h2>
+                <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Schedule Practice</h2>
                 <p style={styles.sectionSubtitle}>
                   Lock in a hard practice date, location, and goal.
                 </p>
@@ -2153,15 +2427,15 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "setAvailability" && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>NEXT 2 WEEKS</p>
-                <h1 style={styles.bandPageTitle}>Set Availability</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Set Availability</h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => setView("availabilityHome")}
                 onMouseEnter={addButtonHover}
                 onMouseLeave={removeButtonHover}
@@ -2172,7 +2446,7 @@ function BandPage({ user, band, goHome }) {
 
             <div style={styles.weekSection}>
               <p style={styles.kicker}>WEEK 1 · MONDAY TO SUNDAY</p>
-              <div style={styles.weekGrid}>
+              <div className="bp-weekGrid" style={styles.weekGrid}>
                 {currentWeekDays.map((day) => {
                   const saved = availabilityDraft[day.key];
 
@@ -2213,7 +2487,7 @@ function BandPage({ user, band, goHome }) {
                           : "NOT SET"}
                       </p>
 
-                      <h2 style={styles.sectionTitle}>{day.label}</h2>
+                      <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{day.label}</h2>
 
                       <p style={styles.sectionSubtitle}>
                         {saved?.slots?.length
@@ -2235,7 +2509,7 @@ function BandPage({ user, band, goHome }) {
 
             <div style={styles.weekSection}>
               <p style={styles.kicker}>WEEK 2 · MONDAY TO SUNDAY</p>
-              <div style={styles.weekGrid}>
+              <div className="bp-weekGrid" style={styles.weekGrid}>
                 {nextWeekDays.map((day) => {
                   const saved = availabilityDraft[day.key];
 
@@ -2276,7 +2550,7 @@ function BandPage({ user, band, goHome }) {
                           : "NOT SET"}
                       </p>
 
-                      <h2 style={styles.sectionTitle}>{day.label}</h2>
+                      <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{day.label}</h2>
 
                       <p style={styles.sectionSubtitle}>
                         {saved?.slots?.length
@@ -2309,15 +2583,15 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "editDayAvailability" && selectedDay && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>EDIT DAY</p>
-                <h1 style={styles.bandPageTitle}>{selectedDay.label}</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>{selectedDay.label}</h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => setView("setAvailability")}
                 onMouseEnter={addButtonHover}
                 onMouseLeave={removeButtonHover}
@@ -2326,9 +2600,9 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.settingsPanel}>
+            <div className="bp-settingsPanel" style={styles.settingsPanel}>
               <button
-                style={styles.primaryButton}
+                className="bp-primaryButton" style={styles.primaryButton}
                 onClick={() => {
                   setAvailabilityDraft((prev) => ({
                     ...prev,
@@ -2347,7 +2621,7 @@ function BandPage({ user, band, goHome }) {
               </button>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => {
                   setAvailabilityDraft((prev) => ({
                     ...prev,
@@ -2365,12 +2639,12 @@ function BandPage({ user, band, goHome }) {
 
               {availabilityDraft[selectedDay.key]?.available && (
                 <>
-                  <h2 style={styles.sectionTitle}>Time Slots</h2>
+                  <h2 className="bp-sectionTitle" style={styles.sectionTitle}>Time Slots</h2>
 
                   {availabilityDraft[selectedDay.key].slots.map((slot, index) => (
-                    <div key={index} style={styles.timeSlotRow}>
+                    <div key={index} className="bp-timeSlotRow" style={styles.timeSlotRow}>
                       <input
-                        style={styles.input}
+                        className="bp-input" style={styles.input}
                         type="time"
                         value={slot.start}
                         onMouseEnter={addInputHover}
@@ -2396,7 +2670,7 @@ function BandPage({ user, band, goHome }) {
                       />
 
                       <input
-                        style={styles.input}
+                        className="bp-input" style={styles.input}
                         type="time"
                         value={slot.end}
                         onMouseEnter={addInputHover}
@@ -2422,7 +2696,7 @@ function BandPage({ user, band, goHome }) {
                       />
 
                       <button
-                        style={styles.dangerButton}
+                        className="bp-dangerButton" style={styles.dangerButton}
                         onClick={() => {
                           setAvailabilityDraft((prev) => {
                             const slots = prev[selectedDay.key].slots.filter(
@@ -2447,7 +2721,7 @@ function BandPage({ user, band, goHome }) {
                   ))}
 
                   <button
-                    style={styles.secondaryButton}
+                    className="bp-secondaryButton" style={styles.secondaryButton}
                     onClick={() => {
                       setAvailabilityDraft((prev) => ({
                         ...prev,
@@ -2469,7 +2743,7 @@ function BandPage({ user, band, goHome }) {
               )}
 
               <button
-                style={styles.primaryButton}
+                className="bp-primaryButton" style={styles.primaryButton}
                 onClick={() => setView("setAvailability")}
                 onMouseEnter={addButtonHover}
                 onMouseLeave={removeButtonHover}
@@ -2481,15 +2755,15 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "viewBandAvailability" && (
-          <div style={styles.availabilityPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-availabilityPage" style={styles.availabilityPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>BAND VIEW</p>
-                <h1 style={styles.bandPageTitle}>Band Availability</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Band Availability</h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => setView("availabilityHome")}
                 onMouseEnter={addButtonHover}
                 onMouseLeave={removeButtonHover}
@@ -2502,7 +2776,7 @@ function BandPage({ user, band, goHome }) {
               <div style={styles.roadie}>Loading availability...</div>
             ) : (
               <>
-                <div style={styles.sharedPanel}>
+                <div className="bp-sharedPanel" style={styles.sharedPanel}>
                   <p style={styles.kicker}>BEST PRACTICE WINDOWS</p>
 
                   {sharedAvailability.length === 0 ? (
@@ -2511,12 +2785,12 @@ function BandPage({ user, band, goHome }) {
                       members submit the exact same time window, it will show here.
                     </p>
                   ) : (
-                    <div style={styles.sharedGrid}>
+                    <div className="bp-sharedGrid" style={styles.sharedGrid}>
                       {sharedAvailability.map((slot, index) => (
-                        <div key={index} style={styles.sharedCard}>
+                        <div key={index} className="bp-sharedCard" style={styles.sharedCard}>
                           <p style={styles.sectionValue}>3+ MEMBERS FREE</p>
 
-                          <h2 style={styles.sectionTitle}>{slot.dayLabel}</h2>
+                          <h2 className="bp-sectionTitle" style={styles.sectionTitle}>{slot.dayLabel}</h2>
 
                           <p style={styles.sectionSubtitle}>
                             {formatTimeLabel(slot.start)} -{" "}
@@ -2537,19 +2811,19 @@ function BandPage({ user, band, goHome }) {
                     <div style={styles.roadie}>No one has submitted yet.</div>
                   ) : (
                     bandAvailability.map((member) => (
-                      <div key={member.id} style={styles.memberCard}>
-                        <h2 style={styles.sectionTitle}>
+                      <div key={member.id} className="bp-memberCard" style={styles.memberCard}>
+                        <h2 className="bp-sectionTitle" style={styles.sectionTitle}>
                           {getMemberName(member)}
                         </h2>
 
                         <div style={styles.memberWeekSection}>
                           <p style={styles.kicker}>WEEK 1 · MONDAY TO SUNDAY</p>
-                          <div style={styles.memberDaysGrid}>
+                          <div className="bp-memberDaysGrid" style={styles.memberDaysGrid}>
                             {currentWeekDays.map((day) => {
                               const dayData = member.days?.[day.key];
 
                               return (
-                                <div key={day.key} style={styles.memberDayCard}>
+                                <div key={day.key} className="bp-memberDayCard" style={styles.memberDayCard}>
                                   <p
                                     style={{
                                       ...styles.sectionValue,
@@ -2592,12 +2866,12 @@ function BandPage({ user, band, goHome }) {
 
                         <div style={styles.memberWeekSection}>
                           <p style={styles.kicker}>WEEK 2 · MONDAY TO SUNDAY</p>
-                          <div style={styles.memberDaysGrid}>
+                          <div className="bp-memberDaysGrid" style={styles.memberDaysGrid}>
                             {nextWeekDays.map((day) => {
                               const dayData = member.days?.[day.key];
 
                               return (
-                                <div key={day.key} style={styles.memberDayCard}>
+                                <div key={day.key} className="bp-memberDayCard" style={styles.memberDayCard}>
                                   <p
                                     style={{
                                       ...styles.sectionValue,
@@ -2647,15 +2921,15 @@ function BandPage({ user, band, goHome }) {
         )}
 
         {view === "settings" && (
-          <div style={styles.settingsPage}>
-            <div style={styles.settingsHeader}>
+          <div className="bp-settingsPage" style={styles.settingsPage}>
+            <div className="bp-settingsHeader" style={styles.settingsHeader}>
               <div>
                 <p style={styles.kicker}>BAND SETTINGS</p>
-                <h1 style={styles.bandPageTitle}>Edit Band</h1>
+                <h1 className="bp-bandPageTitle" style={styles.bandPageTitle}>Edit Band</h1>
               </div>
 
               <button
-                style={styles.secondaryButton}
+                className="bp-secondaryButton" style={styles.secondaryButton}
                 onClick={() => {
                   setView("dashboard");
                   setBandName(band.name);
@@ -2668,9 +2942,9 @@ function BandPage({ user, band, goHome }) {
               </button>
             </div>
 
-            <div style={styles.settingsPanel}>
+            <div className="bp-settingsPanel" style={styles.settingsPanel}>
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 placeholder="Band name"
                 value={bandName}
                 onChange={(e) => setBandName(e.target.value)}
@@ -2679,7 +2953,7 @@ function BandPage({ user, band, goHome }) {
               <label style={styles.fileLabel}>Add Band Logo / Picture</label>
 
               <input
-                style={styles.input}
+                className="bp-input" style={styles.input}
                 type="file"
                 accept="image/*"
                 onChange={(e) => setLogoFile(e.target.files[0])}
@@ -2697,7 +2971,7 @@ function BandPage({ user, band, goHome }) {
                 </p>
               </div>
 
-              <div style={styles.memberSettingsBox}>
+              <div className="bp-memberSettingsBox" style={styles.memberSettingsBox}>
                 <p style={styles.kicker}>BAND MEMBERS</p>
 
                 {loadingMembers ? (
@@ -2707,7 +2981,7 @@ function BandPage({ user, band, goHome }) {
                 ) : (
                   <div style={styles.memberSettingsList}>
                     {memberProfiles.map((member) => (
-                      <div key={member.uid} style={styles.memberSettingsRow}>
+                      <div key={member.uid} className="bp-memberSettingsRow" style={styles.memberSettingsRow}>
                         <div>
                           <h3 style={styles.memberName}>
                             {buildFullName(member) || member.displayName || "Band Member"}
@@ -2715,7 +2989,7 @@ function BandPage({ user, band, goHome }) {
                         </div>
 
                         <select
-                          style={styles.select}
+                          className="bp-select" style={styles.select}
                           value={member.instrument || "Unassigned"}
                           onChange={(e) =>
                             updateMemberInstrument(member.uid, e.target.value)
@@ -2735,9 +3009,9 @@ function BandPage({ user, band, goHome }) {
                 )}
               </div>
 
-              <div style={styles.settingsActions}>
+              <div className="bp-settingsActions" style={styles.settingsActions}>
                 <button
-                  style={styles.primaryButton}
+                  className="bp-primaryButton" style={styles.primaryButton}
                   onClick={handleSaveSettings}
                   disabled={saving}
                   onMouseEnter={addButtonHover}
@@ -2747,7 +3021,7 @@ function BandPage({ user, band, goHome }) {
                 </button>
 
                 <button
-                  style={styles.secondaryButton}
+                  className="bp-secondaryButton" style={styles.secondaryButton}
                   onClick={() => setInviteCode(generateInviteCode())}
                   onMouseEnter={addButtonHover}
                   onMouseLeave={removeButtonHover}
